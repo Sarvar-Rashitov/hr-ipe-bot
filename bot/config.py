@@ -49,6 +49,12 @@ if _admin_ids_raw:
 # Users JSON fayli yo'li
 USERS_FILE = BASE_DIR / "users.json"
 
+# Start xabari uchun rasm yo'li
+IMAGE_PATH = BASE_DIR / "image.png"
+
+# Rasmiy sayt havolasi
+WEBSITE_URL = os.getenv("WEBSITE_URL", "https://ipeschool.uz").strip()
+
 
 def get_channel_link() -> str:
     """Kanalga o'tish tugmasi uchun havola yaratish."""

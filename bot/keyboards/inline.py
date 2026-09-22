@@ -1,24 +1,18 @@
 from typing import List, Optional
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
 
-# Barcha fanlar ro'yxati
+# Barcha fanlar ro'yxati (IPE School kurslari)
 AVAILABLE_SUBJECTS = [
-    "Matematika",
-    "Ingliz tili",
-    "Fizika",
-    "Kimyo",
-    "Biologiya",
-    "Tarix",
-    "Ona tili va adabiyot",
-    "IT / Dasturlash",
-    "Mental arifmetika",
-    "Boshlang'ich ta'lim",
-    "Geografiya",
+    "IELTS",
+    "CEFR",
+    "SAT",
+    "Prezident maktablariga tayyorlov",
+    "IT (Python backend)",
+    "English",
     "Rus tili",
-    "Koreys tili",
-    "Nemis tili",
-    "Arab tili",
-    "Robototexnika"
+    "Matematika",
+    "Ixtisoslashtirilgan maktablarga tayyorlov",
+    "Maktabgacha ta'lim"
 ]
 
 # Hududlar ro'yxati
@@ -38,6 +32,52 @@ REGIONS = [
     "Sirdaryo viloyati",
     "Surxondaryo viloyati"
 ]
+
+
+def get_start_keyboard(channel_url: str, website_url: str = "https://ipeschool.uz") -> InlineKeyboardMarkup:
+    """
+    /start xabari uchun menyu tugmalari:
+    1-qator: Kanal va Sayt (yonma-yon)
+    2-qator: Asosiy katta 'Rezyume to'ldirish' tugmasi
+    3-qator: 'Biz haqimizda' va 'Yordam'
+    """
+    keyboard = [
+        [
+            InlineKeyboardButton("📢 Telegram kanal", url=channel_url),
+            InlineKeyboardButton("🌐 Rasmiy sayt", url=website_url)
+        ],
+        [
+            InlineKeyboardButton("📝 Rezyume to'ldirish", callback_data="start_resume")
+        ],
+        [
+            InlineKeyboardButton("ℹ️ Biz haqimizda", callback_data="about_us"),
+            InlineKeyboardButton("❓ Yordam", callback_data="bot_help")
+        ]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+
+def get_about_keyboard() -> InlineKeyboardMarkup:
+    """Biz haqimizda va yordam sahifasi tugmalari."""
+    keyboard = [
+        [
+            InlineKeyboardButton("📝 Rezyume to'ldirish", callback_data="start_resume"),
+        ],
+        [
+            InlineKeyboardButton("🔙 Bosh sahifa", callback_data="back_to_start")
+        ]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+
+def get_vacancies_keyboard() -> InlineKeyboardMarkup:
+    """Vakansiyalar (lavozimlar) ro'yxati inline tugmalari."""
+    keyboard = [
+        [InlineKeyboardButton("👨‍🏫 O'qituvchi (Ustoz)", callback_data="vacancy:teacher")],
+        [InlineKeyboardButton("💼 Administrator", callback_data="vacancy:admin")],
+        [InlineKeyboardButton("📈 Sotuv mutaxassisi (Sotuvchi)", callback_data="vacancy:sales")]
+    ]
+    return InlineKeyboardMarkup(keyboard)
 
 
 def get_subscription_keyboard(channel_url: str) -> InlineKeyboardMarkup:
@@ -173,17 +213,21 @@ def get_admin_main_keyboard() -> InlineKeyboardMarkup:
     """Admin boshqaruv paneli tugmalari."""
     keyboard = [
         [InlineKeyboardButton("📢 Reklama yuborish (Broadcast)", callback_data="admin_broadcast")],
-        [InlineKeyboardButton("🔄 Qayta yangilash", callback_data="admin_refresh")]
+        [
+            InlineKeyboardButton("📊 Statistika", callback_data="admin_stats"),
+            InlineKeyboardButton("🔄 Qayta yangilash", callback_data="admin_refresh")
+        ],
+        [InlineKeyboardButton("👤 Nomzod sifatida ko'rish (Preview)", callback_data="admin_candidate_preview")]
     ]
     return InlineKeyboardMarkup(keyboard)
 
 
 def get_broadcast_confirm_keyboard() -> InlineKeyboardMarkup:
-    """Reklamani yuborishni tasdiqlash yoki bekor qilish."""
+    """Reklamani yuborishni tasdiqlash yoki bekor qilish (PDF standarti)."""
     keyboard = [
         [
-            InlineKeyboardButton("✅ Tasdiqlash va yuborish", callback_data="broadcast_confirm"),
-            InlineKeyboardButton("❌ Bekor qilish", callback_data="broadcast_cancel")
+            InlineKeyboardButton("✅ Yuborish", callback_data="bc_send"),
+            InlineKeyboardButton("❌ Bekor qilish", callback_data="bc_cancel")
         ]
     ]
     return InlineKeyboardMarkup(keyboard)

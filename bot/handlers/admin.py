@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from telegram import Update
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import (
     ContextTypes,
     ConversationHandler,
@@ -14,16 +14,25 @@ from bot import config, texts
 from bot.states import AdminState
 from bot.keyboards.inline import (
     get_admin_main_keyboard,
-    get_broadcast_confirm_keyboard
+    get_broadcast_confirm_keyboard,
+    get_start_keyboard
 )
-from bot.utils.storage import load_users, get_users_count
+from bot.utils.storage import (
+    load_users,
+    get_users_count,
+    get_all_user_ids,
+    remove_user
+)
 from bot.handlers.fallback import cancel_command
 
 logger = logging.getLogger(__name__)
 
 
+# -------------------------------------------------------------
+# ADMIN PANEL DASHBOARD
+# -------------------------------------------------------------
 async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Admin panelni ochish (/admin)."""
+    """Admin panelni ochish (/admin yoki /start admin bo'lganda)."""
     user = update.effective_user
     if not user or not config.is_admin(user.id):
         if update.message:
@@ -55,18 +64,107 @@ async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         )
 
 
-async def start_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Reklama yuborish jarayonini boshlash."""
+async def admin_stats_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Batafsil statistikani ko'rsatish."""
     query = update.callback_query
     user = update.effective_user
     if not user or not config.is_admin(user.id):
         if query:
             await query.answer("Ruxsat berilmagan!", show_alert=True)
+        return
+
+    await query.answer()
+    total = get_users_count()
+    channel = config.CHANNEL_USERNAME or "Ko'rsatilmagan"
+    hr_chat = str(config.HR_CHAT_ID) or "Ko'rsatilmagan"
+
+    text = texts.ADMIN_STATS_TEXT.format(
+        total_users=total,
+        channel=channel,
+        hr_chat_id=hr_chat
+    )
+
+    back_keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🔙 Admin panelga qaytish", callback_data="admin_refresh")]
+    ])
+
+    try:
+        await query.edit_message_text(
+            text,
+            reply_markup=back_keyboard,
+            parse_mode="Markdown"
+        )
+    except Exception:
+        await query.message.reply_text(
+            text,
+            reply_markup=back_keyboard,
+            parse_mode="Markdown"
+        )
+
+
+async def admin_candidate_preview_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Nomzod ko'rinishini (preview) adminga ko'rsatish."""
+    query = update.callback_query
+    user = update.effective_user
+    if not user or not config.is_admin(user.id):
+        if query:
+            await query.answer("Ruxsat berilmagan!", show_alert=True)
+        return
+
+    await query.answer()
+    channel_url = config.get_channel_link()
+    candidate_kb = get_start_keyboard(channel_url, config.WEBSITE_URL)
+
+    # Qo'shimcha admin panelga qaytish tugmasini qo'shish
+    buttons = [row.copy() for row in candidate_kb.inline_keyboard]
+    buttons.append([InlineKeyboardButton("🔙 Admin panelga qaytish", callback_data="admin_refresh")])
+    preview_kb = InlineKeyboardMarkup(buttons)
+
+    caption = (
+        "👁 **[ADMIN PREVIEW] Nomzodlar uchun ko'rinish:**\n\n"
+        + texts.START_WELCOME
+    )
+
+    if config.IMAGE_PATH.exists():
+        try:
+            with open(config.IMAGE_PATH, "rb") as photo_file:
+                await query.message.reply_photo(
+                    photo=photo_file,
+                    caption=caption,
+                    reply_markup=preview_kb,
+                    parse_mode="Markdown"
+                )
+            return
+        except Exception as e:
+            logger.error(f"Preview rasmini yuborishda xatolik: {e}")
+
+    await query.message.reply_text(
+        caption,
+        reply_markup=preview_kb,
+        parse_mode="Markdown",
+        disable_web_page_preview=True
+    )
+
+
+# -------------------------------------------------------------
+# BROADCAST (REKLAMA YUBORISH) OQIMI
+# -------------------------------------------------------------
+async def start_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Reklama yuborish jarayonini boshlash (/broadcast yoki inline tugma)."""
+    user = update.effective_user
+    if not user or not config.is_admin(user.id):
+        if update.callback_query:
+            await update.callback_query.answer("Ruxsat berilmagan!", show_alert=True)
         return ConversationHandler.END
 
-    if query:
-        await query.answer()
-        await query.message.reply_text(
+    if update.callback_query:
+        await update.callback_query.answer()
+        await update.callback_query.message.reply_text(
+            texts.ADMIN_BROADCAST_PROMPT,
+            parse_mode="Markdown"
+        )
+    elif update.message:
+        await update.message.reply_text(
             texts.ADMIN_BROADCAST_PROMPT,
             parse_mode="Markdown"
         )
@@ -80,111 +178,115 @@ async def receive_broadcast_message(update: Update, context: ContextTypes.DEFAUL
         return ConversationHandler.END
 
     msg = update.message
-    broadcast_data = {}
+    if not msg:
+        return AdminState.BROADCAST_MESSAGE
 
-    if msg.photo:
-        broadcast_data["type"] = "photo"
-        broadcast_data["file_id"] = msg.photo[-1].file_id
-        broadcast_data["caption"] = msg.caption or ""
-    elif msg.video:
-        broadcast_data["type"] = "video"
-        broadcast_data["file_id"] = msg.video.file_id
-        broadcast_data["caption"] = msg.caption or ""
-    elif msg.text:
-        broadcast_data["type"] = "text"
-        broadcast_data["text"] = msg.text
-    else:
+    broadcast_data = {
+        "text": msg.text or msg.caption or "",
+        "photo": msg.photo[-1].file_id if msg.photo else None,
+        "video": msg.video.file_id if msg.video else None,
+    }
+
+    if not broadcast_data["text"] and not broadcast_data["photo"] and not broadcast_data["video"]:
         await msg.reply_text("⚠️ Iltimos, faqat rasm, video yoki matnli xabar yuboring.")
         return AdminState.BROADCAST_MESSAGE
 
-    context.user_data["broadcast_data"] = broadcast_data
+    context.user_data["broadcast"] = broadcast_data
 
-    # 1. Admin uchun xabarning ko'rinishini (preview) chiqarish
+    # 1. Preview ko'rsatish — xuddi shu xabarni adminning o'ziga qayta yuboradi (PDF 4-sahifa)
     await msg.reply_text("👁 **Siz yuborgan xabar preview ko'rinishi:**", parse_mode="Markdown")
-    if broadcast_data["type"] == "photo":
-        await context.bot.send_photo(
-            chat_id=user.id,
-            photo=broadcast_data["file_id"],
-            caption=broadcast_data["caption"]
-        )
-    elif broadcast_data["type"] == "video":
-        await context.bot.send_video(
-            chat_id=user.id,
-            video=broadcast_data["file_id"],
-            caption=broadcast_data["caption"]
-        )
-    elif broadcast_data["type"] == "text":
-        await context.bot.send_message(
-            chat_id=user.id,
-            text=broadcast_data["text"]
-        )
+    try:
+        await msg.copy(chat_id=msg.chat_id)
+    except Exception:
+        if broadcast_data["photo"]:
+            await context.bot.send_photo(
+                chat_id=user.id,
+                photo=broadcast_data["photo"],
+                caption=broadcast_data["text"]
+            )
+        elif broadcast_data["video"]:
+            await context.bot.send_video(
+                chat_id=user.id,
+                video=broadcast_data["video"],
+                caption=broadcast_data["text"]
+            )
+        else:
+            await context.bot.send_message(
+                chat_id=user.id,
+                text=broadcast_data["text"]
+            )
 
-    # 2. Tasdiqlash so'rovi
-    total = get_users_count()
+    # 2. Tasdiqlash so'rovi (PDF 5-sahifa)
     await msg.reply_text(
-        texts.ADMIN_BROADCAST_PREVIEW.format(total_users=total),
-        reply_markup=get_broadcast_confirm_keyboard(),
-        parse_mode="Markdown"
+        texts.ADMIN_BROADCAST_PREVIEW,
+        reply_markup=get_broadcast_confirm_keyboard()
     )
     return AdminState.BROADCAST_CONFIRM
 
 
 async def confirm_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Reklamani barcha foydalanuvchilarga yuborish."""
+    """Reklamani barcha foydalanuvchilarga yuborish yoki bekor qilish."""
     query = update.callback_query
     user = update.effective_user
     if not user or not config.is_admin(user.id):
         return ConversationHandler.END
 
     await query.answer()
-    broadcast_data = context.user_data.get("broadcast_data")
-    if not broadcast_data:
+
+    # Bekor qilish bosilgan bo'lsa
+    if query.data in ("bc_cancel", "broadcast_cancel"):
+        await query.edit_message_text(texts.ADMIN_BROADCAST_CANCELLED)
+        context.user_data.clear()
+        return ConversationHandler.END
+
+    data = context.user_data.get("broadcast")
+    if not data:
         await query.message.reply_text("⚠️ Xabar ma'lumotlari topilmadi. Qaytadan /admin bosing.")
         return ConversationHandler.END
 
-    users = load_users()
-    if not users:
-        await query.message.reply_text("⚠️ Hozircha hech qanday foydalanuvchi mavjud emas.")
+    user_ids = get_all_user_ids()
+    if not user_ids:
+        await query.message.reply_text("⚠️ Hozircha bazada foydalanuvchilar mavjud emas.")
         context.user_data.clear()
         return ConversationHandler.END
 
     status_msg = await query.message.reply_text(texts.ADMIN_BROADCAST_START)
 
-    sent_count = 0
-    failed_count = 0
-    msg_type = broadcast_data["type"]
+    sent = 0
+    failed = 0
 
-    for uid in users:
+    for uid in user_ids:
         try:
-            if msg_type == "photo":
+            if data["photo"]:
                 await context.bot.send_photo(
-                    chat_id=uid,
-                    photo=broadcast_data["file_id"],
-                    caption=broadcast_data["caption"]
+                    uid,
+                    data["photo"],
+                    caption=data["text"]
                 )
-            elif msg_type == "video":
+            elif data["video"]:
                 await context.bot.send_video(
-                    chat_id=uid,
-                    video=broadcast_data["file_id"],
-                    caption=broadcast_data["caption"]
+                    uid,
+                    data["video"],
+                    caption=data["text"]
                 )
-            elif msg_type == "text":
+            else:
                 await context.bot.send_message(
-                    chat_id=uid,
-                    text=broadcast_data["text"]
+                    uid,
+                    data["text"]
                 )
-            sent_count += 1
-            await asyncio.sleep(0.05)  # Telegram limitlariga tushmaslik uchun
-        except TelegramError as e:
-            logger.warning(f"Foydalanuvchiga yuborilmadi ({uid}): {e}")
-            failed_count += 1
+            sent += 1
         except Exception as e:
-            logger.error(f"Kutilmagan xatolik ({uid}): {e}")
-            failed_count += 1
+            failed += 1
+            logger.warning(f"Foydalanuvchiga yuborilmadi ({uid}): {e}")
+            # Bot bloklangan yoki chat topilmasa, ro'yxatdan o'chirish (PDF 7-sahifa)
+            remove_user(uid)
+
+        # Telegram flood-limitidan saqlanish uchun (PDF 6-sahifa)
+        await asyncio.sleep(0.05)
 
     result_text = texts.ADMIN_BROADCAST_FINISH.format(
-        sent_count=sent_count,
-        failed_count=failed_count
+        sent_count=sent,
+        failed_count=failed
     )
     await status_msg.edit_text(result_text, parse_mode="Markdown")
     context.user_data.clear()
@@ -204,6 +306,7 @@ async def cancel_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 def get_admin_broadcast_conversation_handler() -> ConversationHandler:
     return ConversationHandler(
         entry_points=[
+            CommandHandler("broadcast", start_broadcast),
             CallbackQueryHandler(start_broadcast, pattern="^admin_broadcast$"),
         ],
         states={
@@ -214,13 +317,12 @@ def get_admin_broadcast_conversation_handler() -> ConversationHandler:
                 )
             ],
             AdminState.BROADCAST_CONFIRM: [
-                CallbackQueryHandler(confirm_broadcast, pattern="^broadcast_confirm$"),
-                CallbackQueryHandler(cancel_broadcast, pattern="^broadcast_cancel$"),
+                CallbackQueryHandler(confirm_broadcast, pattern="^(bc_|broadcast_)"),
             ]
         },
         fallbacks=[
             CommandHandler("cancel", cancel_command),
-            CallbackQueryHandler(cancel_broadcast, pattern="^broadcast_cancel$"),
+            CallbackQueryHandler(cancel_broadcast, pattern="^(bc_cancel|broadcast_cancel)$"),
         ],
         allow_reentry=True,
         per_message=False

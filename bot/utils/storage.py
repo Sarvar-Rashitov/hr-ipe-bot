@@ -48,6 +48,31 @@ def add_user(user_id: int) -> bool:
     return False
 
 
+# PDF talabi bo'yicha nomlanishlar
+def save_user(chat_id: int) -> bool:
+    """Foydalanuvchi chat_id sini users.json ga saqlash."""
+    return add_user(chat_id)
+
+
+def get_all_user_ids() -> list[int]:
+    """Barcha foydalanuvchilar ID larini olish."""
+    return load_users()
+
+
+def remove_user(user_id: int) -> bool:
+    """
+    Botni bloklagan yoki chatni o'chirgan foydalanuvchini users.json dan o'chirish.
+    (PDF 7-sahifa tavsiyasi)
+    """
+    users = load_users()
+    if user_id in users:
+        users.remove(user_id)
+        save_users(users)
+        logger.info(f"Foydalanuvchi ro'yxatdan o'chirildi (blok/o'chirilgan): {user_id}")
+        return True
+    return False
+
+
 def get_users_count() -> int:
     """Foydalanuvchilar umumiy sonini qaytarish."""
     return len(load_users())

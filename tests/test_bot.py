@@ -8,8 +8,17 @@ from bot.utils.validators import (
 )
 from bot.utils.hashtags import generate_hashtags, create_hashtag_from_text
 from bot.utils.formatter import format_resume
-from bot.utils.storage import add_user, load_users, get_users_count
+from bot.utils.storage import (
+    add_user,
+    load_users,
+    get_users_count,
+    save_user,
+    get_all_user_ids,
+    remove_user
+)
 from bot.keyboards.inline import (
+    get_start_keyboard,
+    get_vacancies_keyboard,
     get_subscription_keyboard,
     get_regions_keyboard,
     get_degree_keyboard,
@@ -19,7 +28,11 @@ from bot.keyboards.inline import (
     get_average_result_keyboard,
     get_rating_5_keyboard,
     get_work_type_keyboard,
-    get_phone_request_keyboard
+    get_phone_request_keyboard,
+    get_admin_main_keyboard,
+    get_broadcast_confirm_keyboard,
+    get_about_keyboard,
+    AVAILABLE_SUBJECTS
 )
 
 
@@ -126,6 +139,65 @@ class TestFormatter(unittest.TestCase):
         self.assertIn("#Matematika", caption)
         self.assertIn("Test Nomzod", caption)
 
+    def test_format_resume_admin(self):
+        data = {
+            "role": "admin",
+            "full_name": "Madina Rahimova",
+            "phone": "+998911234567",
+            "username": "@madina_admin",
+            "region": "Toshkent shahri",
+            "age": 25,
+            "university": "O'zJOKU",
+            "faculty": "Menejment",
+            "degree": "Bakalavr",
+            "english_level": "B2",
+            "russian_level": "Yuqori",
+            "experience_years": "2 yil",
+            "admin_office_software": "Excel, Word, Modme CRM",
+            "admin_multitasking": "Yuqori, vazifalarni Trello orqali rejalashtiraman",
+            "admin_guest_reception": "Samimiy tabassum va qulaylik",
+            "admin_conflict_resolution": "Xotirjam tinglab, yechim taklif qilganman",
+            "admin_attendance_payments": "Ha, Modme orqali kunlik nazorat qilganman",
+            "admin_last_job": "Edu Center, karyera o'sishi uchun",
+            "admin_why_ipe": "Katta jamoa va zamonaviy tizim",
+            "admin_goals_2y": "Bosh administrator bo'lish",
+            "work_type": "Full-time",
+            "expected_salary": "6 000 000 so'm"
+        }
+        caption, full_text = format_resume(data)
+        self.assertIn("#Administrator", caption)
+        self.assertIn("Madina Rahimova", caption)
+
+    def test_format_resume_sales(self):
+        data = {
+            "role": "sales",
+            "full_name": "Javohir Toshmatov",
+            "phone": "+998931234567",
+            "username": "@javohir_sales",
+            "region": "Samarqand viloyati",
+            "age": 26,
+            "university": "SamDU",
+            "faculty": "Marketing",
+            "degree": "Bakalavr",
+            "english_level": "O'rta",
+            "russian_level": "Yuqori",
+            "experience_years": "3 yil",
+            "sales_experience": "Ta'lim va IT kurslari sotuvi, issiq/sovuq qo'ng'iroqlar",
+            "sales_crm_tools": "AmoCRM, Bitrix24, Zadarma telefoniya",
+            "sales_record": "Bir oyda 45 ta o'quvchi (120 mln so'm)",
+            "sales_objections": "Qiymatni ko'rsatish va xavfni kamaytirish orqali",
+            "sales_difficult_client": "Ikkilangan ota-onaga ochiq dars taklif qilib sotuv qilganman",
+            "sales_kpi_rating": "5 - har doim planni 100%+ bajarganman",
+            "sales_last_job": "Online School, yangi maqsadlar uchun",
+            "sales_why_ipe": "Sifatli ta'lim mahsulotini sotishni xohlayman",
+            "sales_goals_2y": "Sotuv bo'limi boshlig'i (ROP) bo'lish",
+            "work_type": "Full-time",
+            "expected_salary": "10 000 000 so'm"
+        }
+        caption, full_text = format_resume(data)
+        self.assertIn("#Sotuvchi", caption)
+        self.assertIn("Javohir Toshmatov", caption)
+
 
 class TestKeyboards(unittest.TestCase):
     def test_keyboards_generate_without_error(self):
@@ -159,15 +231,73 @@ class TestKeyboards(unittest.TestCase):
         kb_phone = get_phone_request_keyboard()
         self.assertIsNotNone(kb_phone)
 
+    def test_vacancies_keyboard(self):
+        kb_vac = get_vacancies_keyboard()
+        self.assertIsNotNone(kb_vac)
+        # 3 ta tugma (qatorlar bo'yicha)
+        self.assertEqual(len(kb_vac.inline_keyboard), 3)
+        self.assertEqual(kb_vac.inline_keyboard[0][0].callback_data, "vacancy:teacher")
+        self.assertEqual(kb_vac.inline_keyboard[1][0].callback_data, "vacancy:admin")
+        self.assertEqual(kb_vac.inline_keyboard[2][0].callback_data, "vacancy:sales")
+
+    def test_start_keyboard(self):
+        kb_start = get_start_keyboard("https://t.me/ipeschool", "https://ipeschool.uz")
+        self.assertIsNotNone(kb_start)
+        # 3 qator
+        self.assertEqual(len(kb_start.inline_keyboard), 3)
+        # 1-qator: 2 ta tugma (kanal va sayt)
+        self.assertEqual(len(kb_start.inline_keyboard[0]), 2)
+        self.assertEqual(kb_start.inline_keyboard[0][0].url, "https://t.me/ipeschool")
+        self.assertEqual(kb_start.inline_keyboard[0][1].url, "https://ipeschool.uz")
+        # 2-qator: 1 ta tugma (start_resume callback)
+        self.assertEqual(len(kb_start.inline_keyboard[1]), 1)
+        self.assertEqual(kb_start.inline_keyboard[1][0].callback_data, "start_resume")
+        # 3-qator: 2 ta tugma (about_us va bot_help)
+        self.assertEqual(len(kb_start.inline_keyboard[2]), 2)
+        self.assertEqual(kb_start.inline_keyboard[2][0].callback_data, "about_us")
+        self.assertEqual(kb_start.inline_keyboard[2][1].callback_data, "bot_help")
+
+    def test_about_keyboard(self):
+        kb_about = get_about_keyboard()
+        self.assertIsNotNone(kb_about)
+        self.assertEqual(len(kb_about.inline_keyboard), 2)
+        self.assertEqual(kb_about.inline_keyboard[0][0].callback_data, "start_resume")
+        self.assertEqual(kb_about.inline_keyboard[1][0].callback_data, "back_to_start")
+
+    def test_subjects_list(self):
+        self.assertIn("IELTS", AVAILABLE_SUBJECTS)
+        self.assertIn("IT (Python backend)", AVAILABLE_SUBJECTS)
+        self.assertIn("Prezident maktablariga tayyorlov", AVAILABLE_SUBJECTS)
+        self.assertEqual(len(AVAILABLE_SUBJECTS), 10)
+
+    def test_admin_keyboards(self):
+        kb_admin = get_admin_main_keyboard()
+        self.assertIsNotNone(kb_admin)
+        self.assertEqual(len(kb_admin.inline_keyboard), 3)
+
+        kb_confirm = get_broadcast_confirm_keyboard()
+        self.assertIsNotNone(kb_confirm)
+        self.assertEqual(kb_confirm.inline_keyboard[0][0].callback_data, "bc_send")
+        self.assertEqual(kb_confirm.inline_keyboard[0][1].callback_data, "bc_cancel")
+
 
 class TestStorage(unittest.TestCase):
     def test_storage(self):
-        initial_count = get_users_count()
-        # Test adding a unique user
         test_uid = 999999999
         add_user(test_uid)
         users = load_users()
         self.assertIn(test_uid, users)
+
+    def test_save_and_get_and_remove_user(self):
+        test_uid = 888888888
+        save_user(test_uid)
+        all_users = get_all_user_ids()
+        self.assertIn(test_uid, all_users)
+
+        # Test remove user
+        removed = remove_user(test_uid)
+        self.assertTrue(removed)
+        self.assertNotIn(test_uid, get_all_user_ids())
 
 
 if __name__ == "__main__":

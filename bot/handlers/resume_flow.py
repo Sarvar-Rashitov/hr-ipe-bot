@@ -11,6 +11,7 @@ from telegram.ext import (
 from bot import config, texts
 from bot.states import ResumeState
 from bot.keyboards.inline import (
+    get_vacancies_keyboard,
     get_phone_request_keyboard,
     get_username_keyboard,
     get_regions_keyboard,
@@ -39,10 +40,10 @@ logger = logging.getLogger(__name__)
 
 
 # -------------------------------------------------------------
-# ENTRY POINTS
+# ENTRY POINTS & VACANCY SELECTION
 # -------------------------------------------------------------
 async def start_resume_flow(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Anketa oqimini boshlash."""
+    """Anketa oqimini boshlash: Obunani tekshirish va vakansiya tanlashni ko'rsatish."""
     user = update.effective_user
     if not user:
         return ConversationHandler.END
@@ -50,10 +51,19 @@ async def start_resume_flow(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     # Obunani tekshirish
     is_sub = await check_user_subscription(context.bot, user.id)
     if not is_sub:
-        msg = update.effective_message
         channel_url = config.get_channel_link()
-        if msg:
-            await msg.reply_text(
+        if update.callback_query:
+            await update.callback_query.answer(
+                "❌ Siz hali kanalga obuna bo'lmadingiz! Iltimos, avval kanalimizga a'zo bo'ling.",
+                show_alert=True
+            )
+            await update.callback_query.message.reply_text(
+                texts.SUBSCRIPTION_NOT_FOUND,
+                reply_markup=get_subscription_keyboard(channel_url),
+                parse_mode="Markdown"
+            )
+        elif update.effective_message:
+            await update.effective_message.reply_text(
                 texts.SUBSCRIPTION_NOT_FOUND,
                 reply_markup=get_subscription_keyboard(channel_url),
                 parse_mode="Markdown"
@@ -66,20 +76,22 @@ async def start_resume_flow(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     if update.callback_query:
         await update.callback_query.answer()
         await update.callback_query.message.reply_text(
-            texts.Q_FULL_NAME,
+            texts.CHOOSE_VACANCY,
+            reply_markup=get_vacancies_keyboard(),
             parse_mode="Markdown"
         )
     elif update.message:
         await update.message.reply_text(
-            texts.Q_FULL_NAME,
+            texts.CHOOSE_VACANCY,
+            reply_markup=get_vacancies_keyboard(),
             parse_mode="Markdown"
         )
 
-    return ResumeState.FULL_NAME
+    return ResumeState.VACANCY_SELECT
 
 
 async def check_sub_and_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """'Obuna bo'ldim' tugmasi bosilganda obunani tekshirib, anketani boshlash."""
+    """'Obuna bo'ldim' tugmasi bosilganda obunani tekshirib, vakansiya tanlashga o'tish."""
     query = update.callback_query
     user = update.effective_user
     if not query or not user:
@@ -112,10 +124,53 @@ async def check_sub_and_start(update: Update, context: ContextTypes.DEFAULT_TYPE
         pass
 
     await query.message.reply_text(
+        texts.CHOOSE_VACANCY,
+        reply_markup=get_vacancies_keyboard(),
+        parse_mode="Markdown"
+    )
+    return ResumeState.VACANCY_SELECT
+
+
+async def step_vacancy_selected(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Nomzod qaysi vakansiyaga topshirishni tanlaganda."""
+    query = update.callback_query
+    if not query:
+        return ResumeState.VACANCY_SELECT
+    await query.answer()
+
+    role = query.data.split(":", 1)[1]  # "teacher", "admin", "sales"
+    context.user_data["role"] = role
+
+    role_names = {
+        "teacher": "👨‍🏫 O'qituvchi (Ustoz)",
+        "admin": "💼 Administrator",
+        "sales": "📈 Sotuv mutaxassisi (Sotuvchi)"
+    }
+    selected_name = role_names.get(role, "O'qituvchi")
+
+    try:
+        await query.edit_message_text(
+            f"✅ **Tanlangan yo'nalish:** {selected_name}\n\n"
+            f"Keling, anketani to'ldirishni boshlaymiz!",
+            parse_mode="Markdown"
+        )
+    except Exception:
+        pass
+
+    await query.message.reply_text(
         texts.Q_FULL_NAME,
         parse_mode="Markdown"
     )
     return ResumeState.FULL_NAME
+
+
+async def step_vacancy_invalid(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Tugma o'rniga matn yozilganda ogohlantirish."""
+    await update.message.reply_text(
+        "Iltimos, yuqoridagi tugmalardan birini tanlang:",
+        reply_markup=get_vacancies_keyboard()
+    )
+    return ResumeState.VACANCY_SELECT
 
 
 # -------------------------------------------------------------
@@ -347,25 +402,54 @@ async def step_experience_callback(update: Update, context: ContextTypes.DEFAULT
     exp = query.data.split(":", 1)[1]
     context.user_data["experience_years"] = exp
 
-    selected = context.user_data.setdefault("subjects", [])
-    await query.message.reply_text(
-        texts.Q_SUBJECTS,
-        reply_markup=get_subjects_keyboard(selected),
-        parse_mode="Markdown"
-    )
-    return ResumeState.SUBJECTS
+    role = context.user_data.get("role", "teacher")
+    if role == "admin":
+        await query.message.reply_text(
+            texts.Q_ADMIN_OFFICE_SOFTWARE,
+            parse_mode="Markdown"
+        )
+        return ResumeState.ADMIN_OFFICE_SOFTWARE
+    elif role == "sales":
+        await query.message.reply_text(
+            texts.Q_SALES_EXPERIENCE,
+            parse_mode="Markdown"
+        )
+        return ResumeState.SALES_EXPERIENCE
+    else:
+        selected = context.user_data.setdefault("subjects", [])
+        await query.message.reply_text(
+            texts.Q_SUBJECTS,
+            reply_markup=get_subjects_keyboard(selected),
+            parse_mode="Markdown"
+        )
+        return ResumeState.SUBJECTS
 
 
 async def step_experience_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     text = update.message.text.strip()
     context.user_data["experience_years"] = text
-    selected = context.user_data.setdefault("subjects", [])
-    await update.message.reply_text(
-        texts.Q_SUBJECTS,
-        reply_markup=get_subjects_keyboard(selected),
-        parse_mode="Markdown"
-    )
-    return ResumeState.SUBJECTS
+
+    role = context.user_data.get("role", "teacher")
+    if role == "admin":
+        await update.message.reply_text(
+            texts.Q_ADMIN_OFFICE_SOFTWARE,
+            parse_mode="Markdown"
+        )
+        return ResumeState.ADMIN_OFFICE_SOFTWARE
+    elif role == "sales":
+        await update.message.reply_text(
+            texts.Q_SALES_EXPERIENCE,
+            parse_mode="Markdown"
+        )
+        return ResumeState.SALES_EXPERIENCE
+    else:
+        selected = context.user_data.setdefault("subjects", [])
+        await update.message.reply_text(
+            texts.Q_SUBJECTS,
+            reply_markup=get_subjects_keyboard(selected),
+            parse_mode="Markdown"
+        )
+        return ResumeState.SUBJECTS
 
 
 # -------------------------------------------------------------
@@ -603,6 +687,122 @@ async def step_goals_2y(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
 
 
 # -------------------------------------------------------------
+# ADMINISTRATOR HANDLERS
+# -------------------------------------------------------------
+async def step_admin_office_software(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    context.user_data["admin_office_software"] = update.message.text.strip()
+    await update.message.reply_text(texts.Q_ADMIN_MULTITASKING, parse_mode="Markdown")
+    return ResumeState.ADMIN_MULTITASKING
+
+
+async def step_admin_multitasking(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    context.user_data["admin_multitasking"] = update.message.text.strip()
+    await update.message.reply_text(texts.Q_ADMIN_GUEST_RECEPTION, parse_mode="Markdown")
+    return ResumeState.ADMIN_GUEST_RECEPTION
+
+
+async def step_admin_guest_reception(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    context.user_data["admin_guest_reception"] = update.message.text.strip()
+    await update.message.reply_text(texts.Q_ADMIN_CONFLICT_RESOLUTION, parse_mode="Markdown")
+    return ResumeState.ADMIN_CONFLICT_RESOLUTION
+
+
+async def step_admin_conflict_resolution(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    context.user_data["admin_conflict_resolution"] = update.message.text.strip()
+    await update.message.reply_text(texts.Q_ADMIN_ATTENDANCE_PAYMENTS, parse_mode="Markdown")
+    return ResumeState.ADMIN_ATTENDANCE_PAYMENTS
+
+
+async def step_admin_attendance_payments(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    context.user_data["admin_attendance_payments"] = update.message.text.strip()
+    await update.message.reply_text(texts.Q_ADMIN_LAST_JOB, parse_mode="Markdown")
+    return ResumeState.ADMIN_LAST_JOB
+
+
+async def step_admin_last_job(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    context.user_data["admin_last_job"] = update.message.text.strip()
+    await update.message.reply_text(texts.Q_ADMIN_WHY_IPE, parse_mode="Markdown")
+    return ResumeState.ADMIN_WHY_IPE
+
+
+async def step_admin_why_ipe(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    context.user_data["admin_why_ipe"] = update.message.text.strip()
+    await update.message.reply_text(texts.Q_ADMIN_GOALS_2Y, parse_mode="Markdown")
+    return ResumeState.ADMIN_GOALS_2Y
+
+
+async def step_admin_goals_2y(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    context.user_data["admin_goals_2y"] = update.message.text.strip()
+    await update.message.reply_text(
+        texts.Q_WORK_TYPE,
+        reply_markup=get_work_type_keyboard(),
+        parse_mode="Markdown"
+    )
+    return ResumeState.WORK_TYPE
+
+
+# -------------------------------------------------------------
+# SOTUV MUTAXASSISI HANDLERS
+# -------------------------------------------------------------
+async def step_sales_experience(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    context.user_data["sales_experience"] = update.message.text.strip()
+    await update.message.reply_text(texts.Q_SALES_CRM_TOOLS, parse_mode="Markdown")
+    return ResumeState.SALES_CRM_TOOLS
+
+
+async def step_sales_crm_tools(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    context.user_data["sales_crm_tools"] = update.message.text.strip()
+    await update.message.reply_text(texts.Q_SALES_RECORD, parse_mode="Markdown")
+    return ResumeState.SALES_RECORD
+
+
+async def step_sales_record(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    context.user_data["sales_record"] = update.message.text.strip()
+    await update.message.reply_text(texts.Q_SALES_OBJECTIONS, parse_mode="Markdown")
+    return ResumeState.SALES_OBJECTIONS
+
+
+async def step_sales_objections(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    context.user_data["sales_objections"] = update.message.text.strip()
+    await update.message.reply_text(texts.Q_SALES_DIFFICULT_CLIENT, parse_mode="Markdown")
+    return ResumeState.SALES_DIFFICULT_CLIENT
+
+
+async def step_sales_difficult_client(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    context.user_data["sales_difficult_client"] = update.message.text.strip()
+    await update.message.reply_text(texts.Q_SALES_KPI_RATING, parse_mode="Markdown")
+    return ResumeState.SALES_KPI_RATING
+
+
+async def step_sales_kpi_rating(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    context.user_data["sales_kpi_rating"] = update.message.text.strip()
+    await update.message.reply_text(texts.Q_SALES_LAST_JOB, parse_mode="Markdown")
+    return ResumeState.SALES_LAST_JOB
+
+
+async def step_sales_last_job(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    context.user_data["sales_last_job"] = update.message.text.strip()
+    await update.message.reply_text(texts.Q_SALES_WHY_IPE, parse_mode="Markdown")
+    return ResumeState.SALES_WHY_IPE
+
+
+async def step_sales_why_ipe(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    context.user_data["sales_why_ipe"] = update.message.text.strip()
+    await update.message.reply_text(texts.Q_SALES_GOALS_2Y, parse_mode="Markdown")
+    return ResumeState.SALES_GOALS_2Y
+
+
+async def step_sales_goals_2y(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    context.user_data["sales_goals_2y"] = update.message.text.strip()
+    await update.message.reply_text(
+        texts.Q_WORK_TYPE,
+        reply_markup=get_work_type_keyboard(),
+        parse_mode="Markdown"
+    )
+    return ResumeState.WORK_TYPE
+
+
+# -------------------------------------------------------------
 # STEP 28: WORK TYPE
 # -------------------------------------------------------------
 async def step_work_type_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -712,6 +912,10 @@ def get_resume_conversation_handler() -> ConversationHandler:
             CallbackQueryHandler(check_sub_and_start, pattern="^check_subscription$"),
         ],
         states={
+            ResumeState.VACANCY_SELECT: [
+                CallbackQueryHandler(step_vacancy_selected, pattern="^vacancy:"),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, step_vacancy_invalid),
+            ],
             ResumeState.FULL_NAME: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, step_full_name),
             ],
@@ -750,6 +954,7 @@ def get_resume_conversation_handler() -> ConversationHandler:
                 CallbackQueryHandler(step_experience_callback, pattern="^exp:"),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, step_experience_text),
             ],
+            # O'qituvchi bosqichlari
             ResumeState.SUBJECTS: [
                 CallbackQueryHandler(step_subjects_toggle, pattern="^subj_toggle:"),
                 CallbackQueryHandler(step_subjects_done, pattern="^subj_done$"),
@@ -804,6 +1009,63 @@ def get_resume_conversation_handler() -> ConversationHandler:
             ResumeState.GOALS_2Y: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, step_goals_2y),
             ],
+
+            # Administrator bosqichlari
+            ResumeState.ADMIN_OFFICE_SOFTWARE: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, step_admin_office_software),
+            ],
+            ResumeState.ADMIN_MULTITASKING: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, step_admin_multitasking),
+            ],
+            ResumeState.ADMIN_GUEST_RECEPTION: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, step_admin_guest_reception),
+            ],
+            ResumeState.ADMIN_CONFLICT_RESOLUTION: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, step_admin_conflict_resolution),
+            ],
+            ResumeState.ADMIN_ATTENDANCE_PAYMENTS: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, step_admin_attendance_payments),
+            ],
+            ResumeState.ADMIN_LAST_JOB: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, step_admin_last_job),
+            ],
+            ResumeState.ADMIN_WHY_IPE: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, step_admin_why_ipe),
+            ],
+            ResumeState.ADMIN_GOALS_2Y: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, step_admin_goals_2y),
+            ],
+
+            # Sotuv mutaxassisi bosqichlari
+            ResumeState.SALES_EXPERIENCE: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, step_sales_experience),
+            ],
+            ResumeState.SALES_CRM_TOOLS: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, step_sales_crm_tools),
+            ],
+            ResumeState.SALES_RECORD: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, step_sales_record),
+            ],
+            ResumeState.SALES_OBJECTIONS: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, step_sales_objections),
+            ],
+            ResumeState.SALES_DIFFICULT_CLIENT: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, step_sales_difficult_client),
+            ],
+            ResumeState.SALES_KPI_RATING: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, step_sales_kpi_rating),
+            ],
+            ResumeState.SALES_LAST_JOB: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, step_sales_last_job),
+            ],
+            ResumeState.SALES_WHY_IPE: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, step_sales_why_ipe),
+            ],
+            ResumeState.SALES_GOALS_2Y: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, step_sales_goals_2y),
+            ],
+
+            # Yakuniy umumiy bosqichlar
             ResumeState.WORK_TYPE: [
                 CallbackQueryHandler(step_work_type_callback, pattern="^work:"),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, step_work_type_text),
