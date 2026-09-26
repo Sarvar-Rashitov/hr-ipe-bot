@@ -2,6 +2,19 @@ from typing import Dict, Any, Tuple, Optional
 from bot.utils.hashtags import generate_hashtags
 
 
+def sanitize_md(text: Any) -> str:
+    """Foydalanuvchi kiritgan matndagi Markdown buzuvchi belgilarni xavfsiz holatga keltirish."""
+    if text is None:
+        return "-"
+    s = str(text).strip()
+    if not s:
+        return "-"
+    # Markdown maxsus belgilarini xavfsizlashtirish
+    for ch in ("*", "_", "`", "[", "]"):
+        s = s.replace(ch, f"\\{ch}")
+    return s
+
+
 def format_resume(data: Dict[str, Any]) -> Tuple[str, Optional[str]]:
     """
     Nomzod anketasini vakansiya (rol) bo'yicha formatlash.
@@ -9,33 +22,36 @@ def format_resume(data: Dict[str, Any]) -> Tuple[str, Optional[str]]:
     """
     role = data.get("role", "teacher")
 
-    full_name = data.get("full_name", "-")
+    raw_name = data.get("full_name", "-")
+    full_name = sanitize_md(raw_name)
     phone = data.get("phone", "-")
-    username = data.get("username", "-")
-    if username != "-" and not username.startswith("@") and username != "Username yo'q":
-        username = f"@{username}"
+    raw_user = data.get("username", "-")
+    if raw_user != "-" and not raw_user.startswith("@") and raw_user != "Username yo'q":
+        raw_user = f"@{raw_user}"
+    username = sanitize_md(raw_user)
         
-    region = data.get("region", "-")
-    age = data.get("age", "-")
-    university = data.get("university", "-")
-    faculty = data.get("faculty", "-")
-    degree = data.get("degree", "-")
-    english_level = data.get("english_level", "-")
-    russian_level = data.get("russian_level", "-")
-    experience = data.get("experience_years", "-")
-    work_type = data.get("work_type", "-")
-    salary = data.get("expected_salary", "-")
+    region = sanitize_md(data.get("region", "-"))
+    age = sanitize_md(data.get("age", "-"))
+    university = sanitize_md(data.get("university", "-"))
+    faculty = sanitize_md(data.get("faculty", "-"))
+    degree = sanitize_md(data.get("degree", "-"))
+    english_level = sanitize_md(data.get("english_level", "-"))
+    russian_level = sanitize_md(data.get("russian_level", "-"))
+    experience = sanitize_md(data.get("experience_years", "-"))
+    work_type = sanitize_md(data.get("work_type", "-"))
+    salary = sanitize_md(data.get("expected_salary", "-"))
+
 
     if role == "admin":
         hashtags = generate_hashtags(role="admin", region=region)
-        admin_software = data.get("admin_office_software", "-")
-        admin_multitasking = data.get("admin_multitasking", "-")
-        admin_reception = data.get("admin_guest_reception", "-")
-        admin_conflict = data.get("admin_conflict_resolution", "-")
-        admin_attendance = data.get("admin_attendance_payments", "-")
-        admin_last_job = data.get("admin_last_job", "-")
-        admin_why_ipe = data.get("admin_why_ipe", "-")
-        admin_goals_2y = data.get("admin_goals_2y", "-")
+        admin_software = sanitize_md(data.get("admin_office_software", "-"))
+        admin_multitasking = sanitize_md(data.get("admin_multitasking", "-"))
+        admin_reception = sanitize_md(data.get("admin_guest_reception", "-"))
+        admin_conflict = sanitize_md(data.get("admin_conflict_resolution", "-"))
+        admin_attendance = sanitize_md(data.get("admin_attendance_payments", "-"))
+        admin_last_job = sanitize_md(data.get("admin_last_job", "-"))
+        admin_why_ipe = sanitize_md(data.get("admin_why_ipe", "-"))
+        admin_goals_2y = sanitize_md(data.get("admin_goals_2y", "-"))
 
         full_text = (
             f"{hashtags}\n\n"
@@ -87,21 +103,21 @@ def format_resume(data: Dict[str, Any]) -> Tuple[str, Optional[str]]:
             f"• **Ish turi:** {work_type}\n"
             f"• **Kutilayotgan maosh:** {salary}\n"
             f"━━━━━━━━━━━━━━━━━━━━\n"
-            f"👇 _To'liq anketa tafsilotlari quyida keltirilgan:_"
+            f"👇 _To'liq 22 savolli anketa tafsilotlari quyida keltirilgan:_"
         )
         return caption, full_text
 
     elif role == "sales":
         hashtags = generate_hashtags(role="sales", region=region)
-        sales_exp = data.get("sales_experience", "-")
-        sales_crm = data.get("sales_crm_tools", "-")
-        sales_record = data.get("sales_record", "-")
-        sales_objections = data.get("sales_objections", "-")
-        sales_diff_client = data.get("sales_difficult_client", "-")
-        sales_kpi = data.get("sales_kpi_rating", "-")
-        sales_last_job = data.get("sales_last_job", "-")
-        sales_why_ipe = data.get("sales_why_ipe", "-")
-        sales_goals_2y = data.get("sales_goals_2y", "-")
+        sales_exp = sanitize_md(data.get("sales_experience", "-"))
+        sales_crm = sanitize_md(data.get("sales_crm_tools", "-"))
+        sales_record = sanitize_md(data.get("sales_record", "-"))
+        sales_objections = sanitize_md(data.get("sales_objections", "-"))
+        sales_diff_client = sanitize_md(data.get("sales_difficult_client", "-"))
+        sales_kpi = sanitize_md(data.get("sales_kpi_rating", "-"))
+        sales_last_job = sanitize_md(data.get("sales_last_job", "-"))
+        sales_why_ipe = sanitize_md(data.get("sales_why_ipe", "-"))
+        sales_goals_2y = sanitize_md(data.get("sales_goals_2y", "-"))
 
         full_text = (
             f"{hashtags}\n\n"
@@ -154,7 +170,7 @@ def format_resume(data: Dict[str, Any]) -> Tuple[str, Optional[str]]:
             f"• **Ish turi:** {work_type}\n"
             f"• **Kutilayotgan maosh:** {salary}\n"
             f"━━━━━━━━━━━━━━━━━━━━\n"
-            f"👇 _To'liq anketa tafsilotlari quyida keltirilgan:_"
+            f"👇 _To'liq 23 savolli anketa tafsilotlari quyida keltirilgan:_"
         )
         return caption, full_text
 
@@ -163,23 +179,24 @@ def format_resume(data: Dict[str, Any]) -> Tuple[str, Optional[str]]:
         subjects = data.get("subjects", [])
         hashtags = generate_hashtags(subjects, role="teacher", region=region)
         subjects_str = ", ".join(subjects) if isinstance(subjects, list) else str(subjects)
+        subjects_str = sanitize_md(subjects_str)
 
-        max_group = data.get("max_group_size", "-")
-        last_job = data.get("last_job", "-")
-        student_results = data.get("student_results", "-")
-        best_student_result = data.get("best_student_result", "-")
-        avg_result = data.get("average_result", "-")
-        retention = data.get("retention_methods", "-")
-        dropout = data.get("dropout_steps", "-")
-        diff_rating = data.get("difficult_student_rating", "-")
-        diff_example = data.get("difficult_student_example", "-")
-        lesson_structure = data.get("lesson_structure", "-")
-        methods = data.get("methods", "-")
-        tech = data.get("technology_usage", "-")
-        mixed_level = data.get("mixed_level_approach", "-")
-        parent_neg = data.get("parent_negotiation", "-")
-        why_ipe = data.get("why_ipe", "-")
-        goals_2y = data.get("goals_2y", "-")
+        max_group = sanitize_md(data.get("max_group_size", "-"))
+        last_job = sanitize_md(data.get("last_job", "-"))
+        student_results = sanitize_md(data.get("student_results", "-"))
+        best_student_result = sanitize_md(data.get("best_student_result", "-"))
+        avg_result = sanitize_md(data.get("average_result", "-"))
+        retention = sanitize_md(data.get("retention_methods", "-"))
+        dropout = sanitize_md(data.get("dropout_steps", "-"))
+        diff_rating = sanitize_md(data.get("difficult_student_rating", "-"))
+        diff_example = sanitize_md(data.get("difficult_student_example", "-"))
+        lesson_structure = sanitize_md(data.get("lesson_structure", "-"))
+        methods = sanitize_md(data.get("methods", "-"))
+        tech = sanitize_md(data.get("technology_usage", "-"))
+        mixed_level = sanitize_md(data.get("mixed_level_approach", "-"))
+        parent_neg = sanitize_md(data.get("parent_negotiation", "-"))
+        why_ipe = sanitize_md(data.get("why_ipe", "-"))
+        goals_2y = sanitize_md(data.get("goals_2y", "-"))
 
         # To'liq batafsil anketa matni
         full_text = (
@@ -246,3 +263,4 @@ def format_resume(data: Dict[str, Any]) -> Tuple[str, Optional[str]]:
             f"👇 _To'liq 30 savolli anketa tafsiloti quyida keltirilgan:_"
         )
         return caption, full_text
+

@@ -23,6 +23,7 @@ from bot.keyboards.inline import (
     get_rating_5_keyboard,
     get_work_type_keyboard,
     get_subscription_keyboard,
+    get_hr_resume_keyboard,
     AVAILABLE_SUBJECTS
 )
 from bot.utils.validators import (
@@ -33,7 +34,7 @@ from bot.utils.validators import (
     validate_salary
 )
 from bot.utils.formatter import format_resume
-from bot.handlers.subscription import check_user_subscription
+from bot.handlers.subscription import check_user_subscriptions
 from bot.handlers.fallback import cancel_command
 
 logger = logging.getLogger(__name__)
@@ -48,29 +49,31 @@ async def start_resume_flow(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     if not user:
         return ConversationHandler.END
 
-    # Obunani tekshirish
-    is_sub = await check_user_subscription(context.bot, user.id)
+    # Obunani barcha kanallar bo'yicha tekshirish
+    is_sub, missing = await check_user_subscriptions(context.bot, user.id)
     if not is_sub:
-        channel_url = config.get_channel_link()
+        missing_channels = missing if missing else config.get_required_channels()
+        keyboard = get_subscription_keyboard(missing_channels)
         if update.callback_query:
             await update.callback_query.answer(
-                "❌ Siz hali kanalga obuna bo'lmadingiz! Iltimos, avval kanalimizga a'zo bo'ling.",
+                "❌ Siz hali kanal(lar)imizga obuna bo'lmadingiz! Iltimos, avval obuna bo'ling.",
                 show_alert=True
             )
             await update.callback_query.message.reply_text(
                 texts.SUBSCRIPTION_NOT_FOUND,
-                reply_markup=get_subscription_keyboard(channel_url),
+                reply_markup=keyboard,
                 parse_mode="Markdown"
             )
         elif update.effective_message:
             await update.effective_message.reply_text(
                 texts.SUBSCRIPTION_NOT_FOUND,
-                reply_markup=get_subscription_keyboard(channel_url),
+                reply_markup=keyboard,
                 parse_mode="Markdown"
             )
         return ConversationHandler.END
 
     context.user_data.clear()
+    context.user_data["candidate_user_id"] = user.id
     context.user_data["subjects"] = []
 
     if update.callback_query:
@@ -97,14 +100,14 @@ async def check_sub_and_start(update: Update, context: ContextTypes.DEFAULT_TYPE
     if not query or not user:
         return ConversationHandler.END
 
-    is_sub = await check_user_subscription(context.bot, user.id)
+    is_sub, missing = await check_user_subscriptions(context.bot, user.id)
     if not is_sub:
-        await query.answer("❌ Siz hali kanalga obuna bo'lmadingiz!", show_alert=True)
-        channel_url = config.get_channel_link()
+        await query.answer("❌ Siz hali barcha kanal(lar)ga a'zo bo'lmadingiz!", show_alert=True)
+        missing_channels = missing if missing else config.get_required_channels()
         try:
             await query.edit_message_text(
                 texts.SUBSCRIPTION_NOT_FOUND,
-                reply_markup=get_subscription_keyboard(channel_url),
+                reply_markup=get_subscription_keyboard(missing_channels),
                 parse_mode="Markdown"
             )
         except Exception:
@@ -113,6 +116,7 @@ async def check_sub_and_start(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     await query.answer("✅ Obuna tasdiqlandi!")
     context.user_data.clear()
+    context.user_data["candidate_user_id"] = user.id
     context.user_data["subjects"] = []
 
     try:
@@ -129,6 +133,7 @@ async def check_sub_and_start(update: Update, context: ContextTypes.DEFAULT_TYPE
         parse_mode="Markdown"
     )
     return ResumeState.VACANCY_SELECT
+
 
 
 async def step_vacancy_selected(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -374,8 +379,11 @@ async def step_russian_level_callback(update: Update, context: ContextTypes.DEFA
     level = query.data.split(":", 1)[1]
     context.user_data["russian_level"] = level
 
+    role = context.user_data.get("role", "teacher")
+    exp_text = texts.get_experience_question(role)
+
     await query.message.reply_text(
-        texts.Q_EXPERIENCE_YEARS,
+        exp_text,
         reply_markup=get_experience_keyboard(),
         parse_mode="Markdown"
     )
@@ -385,12 +393,17 @@ async def step_russian_level_callback(update: Update, context: ContextTypes.DEFA
 async def step_russian_level_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     text = update.message.text.strip()
     context.user_data["russian_level"] = text
+
+    role = context.user_data.get("role", "teacher")
+    exp_text = texts.get_experience_question(role)
+
     await update.message.reply_text(
-        texts.Q_EXPERIENCE_YEARS,
+        exp_text,
         reply_markup=get_experience_keyboard(),
         parse_mode="Markdown"
     )
     return ResumeState.EXPERIENCE_YEARS
+
 
 
 # -------------------------------------------------------------
@@ -734,7 +747,7 @@ async def step_admin_why_ipe(update: Update, context: ContextTypes.DEFAULT_TYPE)
 async def step_admin_goals_2y(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data["admin_goals_2y"] = update.message.text.strip()
     await update.message.reply_text(
-        texts.Q_WORK_TYPE,
+        texts.Q_ADMIN_WORK_TYPE,
         reply_markup=get_work_type_keyboard(),
         parse_mode="Markdown"
     )
@@ -795,7 +808,7 @@ async def step_sales_why_ipe(update: Update, context: ContextTypes.DEFAULT_TYPE)
 async def step_sales_goals_2y(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data["sales_goals_2y"] = update.message.text.strip()
     await update.message.reply_text(
-        texts.Q_WORK_TYPE,
+        texts.Q_SALES_WORK_TYPE,
         reply_markup=get_work_type_keyboard(),
         parse_mode="Markdown"
     )
@@ -803,7 +816,7 @@ async def step_sales_goals_2y(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 
 # -------------------------------------------------------------
-# STEP 28: WORK TYPE
+# YAKUNIY BOSQICHLAR: WORK TYPE, SALARY, PHOTO
 # -------------------------------------------------------------
 async def step_work_type_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
@@ -811,19 +824,26 @@ async def step_work_type_callback(update: Update, context: ContextTypes.DEFAULT_
     work_type = query.data.split(":", 1)[1]
     context.user_data["work_type"] = work_type
 
-    await query.message.reply_text(texts.Q_EXPECTED_SALARY, parse_mode="Markdown")
+    role = context.user_data.get("role", "teacher")
+    salary_question = texts.get_salary_question(role)
+
+    await query.message.reply_text(salary_question, parse_mode="Markdown")
     return ResumeState.EXPECTED_SALARY
 
 
 async def step_work_type_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     text = update.message.text.strip()
     context.user_data["work_type"] = text
-    await update.message.reply_text(texts.Q_EXPECTED_SALARY, parse_mode="Markdown")
+
+    role = context.user_data.get("role", "teacher")
+    salary_question = texts.get_salary_question(role)
+
+    await update.message.reply_text(salary_question, parse_mode="Markdown")
     return ResumeState.EXPECTED_SALARY
 
 
 # -------------------------------------------------------------
-# STEP 29: EXPECTED SALARY
+# STEP: EXPECTED SALARY
 # -------------------------------------------------------------
 async def step_expected_salary(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     text = update.message.text
@@ -833,70 +853,170 @@ async def step_expected_salary(update: Update, context: ContextTypes.DEFAULT_TYP
         return ResumeState.EXPECTED_SALARY
 
     context.user_data["expected_salary"] = formatted_salary
-    await update.message.reply_text(texts.Q_PHOTO, parse_mode="Markdown")
+
+    role = context.user_data.get("role", "teacher")
+    photo_question = texts.get_photo_question(role)
+
+    await update.message.reply_text(photo_question, parse_mode="Markdown")
     return ResumeState.PHOTO
 
 
 # -------------------------------------------------------------
-# STEP 30: PHOTO & FINAL SUBMISSION
+# STEP: PHOTO & FINAL SUBMISSION (Photo + Document qabul qilish)
 # -------------------------------------------------------------
+async def _safe_send_resume(bot, chat_id, file_id, is_document, caption, full_text, reply_markup=None):
+    """
+    Kanal yoki guruhga rezyumeni xatoliksiz yetkazish.
+    Agar Markdown parse xatoligi bersa, darhol toza matn (parse_mode=None) bilan qayta yuboradi.
+    """
+    try:
+        if is_document:
+            await bot.send_document(
+                chat_id=chat_id,
+                document=file_id,
+                caption=caption,
+                parse_mode="Markdown",
+                reply_markup=reply_markup
+            )
+        else:
+            await bot.send_photo(
+                chat_id=chat_id,
+                photo=file_id,
+                caption=caption,
+                parse_mode="Markdown",
+                reply_markup=reply_markup
+            )
+    except Exception as e:
+        logger.warning(f"Markdown rejimida yuborishda xatolik ({chat_id}): {e}. Toza matn bilan qayta yuborilmoqda...")
+        # Fallback: Markdown formatlovchi belgilarni olib tashlab qayta yuborish
+        clean_caption = caption.replace("*", "").replace("_", "").replace("`", "")
+        try:
+            if is_document:
+                await bot.send_document(
+                    chat_id=chat_id,
+                    document=file_id,
+                    caption=clean_caption[:1024],
+                    reply_markup=reply_markup
+                )
+            else:
+                await bot.send_photo(
+                    chat_id=chat_id,
+                    photo=file_id,
+                    caption=clean_caption[:1024],
+                    reply_markup=reply_markup
+                )
+        except Exception as e2:
+            logger.error(f"Fayl/rasmni yuborishda yakuniy xatolik ({chat_id}): {e2}")
+
+    # Agar 2-qism (batafsil full_text) bo'lsa
+    if full_text:
+        try:
+            await bot.send_message(
+                chat_id=chat_id,
+                text=full_text,
+                parse_mode="Markdown"
+            )
+        except Exception as e:
+            logger.warning(f"Full text Markdown xatoligi: {e}. Oddiy matn bilan yuborilmoqda...")
+            clean_full = full_text.replace("*", "").replace("_", "").replace("`", "")
+            try:
+                await bot.send_message(
+                    chat_id=chat_id,
+                    text=clean_full
+                )
+            except Exception as e2:
+                logger.error(f"Full text yuborishda yakuniy xatolik: {e2}")
+
+
 async def step_photo_invalid(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Foydalanuvchi rasm o'rniga fayl yoki matn yuborganda."""
+    """Foydalanuvchi rasm o'rniga boshqa format yuborganda."""
     await update.message.reply_text(texts.ERR_PHOTO_REQUIRED, parse_mode="Markdown")
     return ResumeState.PHOTO
 
 
 async def step_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Nomzod rasmini qabul qilish va anketani yuborish."""
-    photo = update.message.photo[-1]
-    context.user_data["photo_file_id"] = photo.file_id
+    """Nomzod rasmini (photo yoki document) qabul qilish va anketani yuborish."""
+    msg = update.message
+    if not msg:
+        return ResumeState.PHOTO
+
+    is_document = False
+    file_id = None
+
+    if msg.photo:
+        file_id = msg.photo[-1].file_id
+        is_document = False
+    elif msg.document:
+        doc = msg.document
+        mime = (doc.mime_type or "").lower()
+        file_name = (doc.file_name or "").lower()
+        valid_extensions = (".jpg", ".jpeg", ".png", ".webp", ".heic", ".bmp")
+        if mime.startswith("image/") or any(file_name.endswith(ext) for ext in valid_extensions):
+            file_id = doc.file_id
+            is_document = True
+        else:
+            await msg.reply_text(texts.ERR_PHOTO_REQUIRED, parse_mode="Markdown")
+            return ResumeState.PHOTO
+    else:
+        await msg.reply_text(texts.ERR_PHOTO_REQUIRED, parse_mode="Markdown")
+        return ResumeState.PHOTO
+
+    candidate_id = update.effective_user.id if update.effective_user else 0
+    context.user_data["candidate_user_id"] = candidate_id
+    context.user_data["user_id"] = candidate_id
+    context.user_data["photo_file_id"] = file_id
+    context.user_data["photo_is_document"] = is_document
 
     # Formatlash
     caption, full_text = format_resume(context.user_data)
 
-    # 1. CHANNEL_ID ga yuborish
+    # Mahalliy zaxira fayliga yozish (data/submissions.json)
+    try:
+        from bot.utils.hr_storage import save_submission
+        save_submission(context.user_data)
+    except Exception as e:
+        logger.error(f"Zaxira saqlashda xatolik: {e}")
+
+    # HR chat uchun harakatlar klaviaturasi
+    hr_keyboard = get_hr_resume_keyboard(candidate_id)
+
+    # 1. CHANNEL_ID ga xavfsiz yuborish
     if config.CHANNEL_ID:
         try:
-            await context.bot.send_photo(
+            await _safe_send_resume(
+                bot=context.bot,
                 chat_id=config.CHANNEL_ID,
-                photo=photo.file_id,
+                file_id=file_id,
+                is_document=is_document,
                 caption=caption,
-                parse_mode="Markdown"
+                full_text=full_text,
+                reply_markup=None
             )
-            if full_text:
-                await context.bot.send_message(
-                    chat_id=config.CHANNEL_ID,
-                    text=full_text,
-                    parse_mode="Markdown"
-                )
         except Exception as e:
             logger.error(f"CHANNEL_ID ga yuborishda xatolik: {e}")
 
-    # 2. HR_CHAT_ID ga yuborish
+    # 2. HR_CHAT_ID ga xavfsiz yuborish (HR tugmalari bilan)
     if config.HR_CHAT_ID:
         try:
-            await context.bot.send_photo(
+            await _safe_send_resume(
+                bot=context.bot,
                 chat_id=config.HR_CHAT_ID,
-                photo=photo.file_id,
+                file_id=file_id,
+                is_document=is_document,
                 caption=caption,
-                parse_mode="Markdown"
+                full_text=full_text,
+                reply_markup=hr_keyboard
             )
-            if full_text:
-                await context.bot.send_message(
-                    chat_id=config.HR_CHAT_ID,
-                    text=full_text,
-                    parse_mode="Markdown"
-                )
         except Exception as e:
             logger.error(f"HR_CHAT_ID ga yuborishda xatolik: {e}")
 
     # Foydalanuvchiga muvaffaqiyat xabari
-    await update.message.reply_text(
+    await msg.reply_text(
         texts.SUBMISSION_SUCCESS,
         parse_mode="Markdown"
     )
 
-    # Sessiyani tozalash (DB yo'q)
+    # Sessiyani tozalash
     context.user_data.clear()
     return ConversationHandler.END
 
@@ -1074,8 +1194,8 @@ def get_resume_conversation_handler() -> ConversationHandler:
                 MessageHandler(filters.TEXT & ~filters.COMMAND, step_expected_salary),
             ],
             ResumeState.PHOTO: [
-                MessageHandler(filters.PHOTO, step_photo),
-                MessageHandler(~filters.PHOTO & ~filters.COMMAND, step_photo_invalid),
+                MessageHandler(filters.PHOTO | filters.Document.ALL, step_photo),
+                MessageHandler(~filters.PHOTO & ~filters.Document.ALL & ~filters.COMMAND, step_photo_invalid),
             ],
         },
         fallbacks=[
@@ -1084,3 +1204,4 @@ def get_resume_conversation_handler() -> ConversationHandler:
         allow_reentry=True,
         per_message=False
     )
+

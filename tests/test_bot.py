@@ -241,21 +241,25 @@ class TestKeyboards(unittest.TestCase):
         self.assertEqual(kb_vac.inline_keyboard[2][0].callback_data, "vacancy:sales")
 
     def test_start_keyboard(self):
-        kb_start = get_start_keyboard("https://t.me/ipeschool", "https://ipeschool.uz")
+        kb_start = get_start_keyboard("https://t.me/ipeschool", "https://ipeschool.uz", "https://www.instagram.com/ipe_school")
         self.assertIsNotNone(kb_start)
-        # 3 qator
-        self.assertEqual(len(kb_start.inline_keyboard), 3)
-        # 1-qator: 2 ta tugma (kanal va sayt)
+        # 4 qator
+        self.assertEqual(len(kb_start.inline_keyboard), 4)
+        # 1-qator: 2 ta tugma (Telegram kanal va Instagram)
         self.assertEqual(len(kb_start.inline_keyboard[0]), 2)
         self.assertEqual(kb_start.inline_keyboard[0][0].url, "https://t.me/ipeschool")
-        self.assertEqual(kb_start.inline_keyboard[0][1].url, "https://ipeschool.uz")
-        # 2-qator: 1 ta tugma (start_resume callback)
+        self.assertEqual(kb_start.inline_keyboard[0][1].url, "https://www.instagram.com/ipe_school")
+        # 2-qator: 1 ta tugma (sayt)
         self.assertEqual(len(kb_start.inline_keyboard[1]), 1)
-        self.assertEqual(kb_start.inline_keyboard[1][0].callback_data, "start_resume")
-        # 3-qator: 2 ta tugma (about_us va bot_help)
-        self.assertEqual(len(kb_start.inline_keyboard[2]), 2)
-        self.assertEqual(kb_start.inline_keyboard[2][0].callback_data, "about_us")
-        self.assertEqual(kb_start.inline_keyboard[2][1].callback_data, "bot_help")
+        self.assertEqual(kb_start.inline_keyboard[1][0].url, "https://ipeschool.uz")
+        # 3-qator: 1 ta tugma (start_resume callback)
+        self.assertEqual(len(kb_start.inline_keyboard[2]), 1)
+        self.assertEqual(kb_start.inline_keyboard[2][0].callback_data, "start_resume")
+        # 4-qator: 2 ta tugma (about_us va bot_help)
+        self.assertEqual(len(kb_start.inline_keyboard[3]), 2)
+        self.assertEqual(kb_start.inline_keyboard[3][0].callback_data, "about_us")
+        self.assertEqual(kb_start.inline_keyboard[3][1].callback_data, "bot_help")
+
 
     def test_about_keyboard(self):
         kb_about = get_about_keyboard()
@@ -300,5 +304,113 @@ class TestStorage(unittest.TestCase):
         self.assertNotIn(test_uid, get_all_user_ids())
 
 
+class TestNewFeatures(unittest.TestCase):
+    def test_role_question_numbering(self):
+        """Admin (22), Sotuvchi (23) va Ustoz (30) savol raqamlari tekshiruvi."""
+        from bot import texts
+
+        # 11-savol matni
+        self.assertIn("O'qituvchilik", texts.get_experience_question("teacher"))
+        self.assertIn("Kasbiy ish tajribangiz", texts.get_experience_question("admin"))
+        self.assertIn("Kasbiy ish tajribangiz", texts.get_experience_question("sales"))
+
+        # Admin: 20 (Ish turi), 21 (Maosh), 22 (Rasm)
+        self.assertTrue(texts.get_work_type_question("admin").startswith("2️⃣0️⃣"))
+        self.assertTrue(texts.get_salary_question("admin").startswith("2️⃣1️⃣"))
+        self.assertTrue(texts.get_photo_question("admin").startswith("2️⃣2️⃣"))
+
+        # Sotuvchi: 21 (Ish turi), 22 (Maosh), 23 (Rasm)
+        self.assertTrue(texts.get_work_type_question("sales").startswith("2️⃣1️⃣"))
+        self.assertTrue(texts.get_salary_question("sales").startswith("2️⃣2️⃣"))
+        self.assertTrue(texts.get_photo_question("sales").startswith("2️⃣3️⃣"))
+
+        # Ustoz: 28 (Ish turi), 29 (Maosh), 30 (Rasm)
+        self.assertTrue(texts.get_work_type_question("teacher").startswith("2️⃣8️⃣"))
+        self.assertTrue(texts.get_salary_question("teacher").startswith("2️⃣9️⃣"))
+        self.assertTrue(texts.get_photo_question("teacher").startswith("3️⃣0️⃣"))
+
+    def test_sanitize_md(self):
+        """Markdown buzuvchi belgilar to'g'ri escape qilinishi tekshiruvi."""
+        from bot.utils.formatter import sanitize_md
+        self.assertEqual(sanitize_md("Ali_Vali"), "Ali\\_Vali")
+        self.assertEqual(sanitize_md("*Top*"), "\\*Top\\*")
+        self.assertEqual(sanitize_md("[Test]"), "\\[Test\\]")
+        self.assertEqual(sanitize_md(""), "-")
+        self.assertEqual(sanitize_md(None), "-")
+
+    def test_multi_channel_subscription_keyboard(self):
+        """Bir nechta kanalli obuna tugmalari tekshiruvi."""
+        test_channels = [
+            {"title": "📢 1-kanal", "url": "https://t.me/chan1"},
+            {"title": "📢 2-kanal", "url": "https://t.me/chan2"}
+        ]
+        kb = get_subscription_keyboard(test_channels)
+        self.assertEqual(len(kb.inline_keyboard), 3)
+        self.assertEqual(kb.inline_keyboard[0][0].url, "https://t.me/chan1")
+        self.assertEqual(kb.inline_keyboard[1][0].url, "https://t.me/chan2")
+        self.assertEqual(kb.inline_keyboard[2][0].callback_data, "check_subscription")
+
+    def test_hr_keyboards(self):
+        """HR harakatlar klaviaturalari tekshiruvi."""
+        from bot.keyboards.inline import get_hr_resume_keyboard, get_admin_hr_keyboard
+        kb_hr = get_hr_resume_keyboard(12345678)
+        self.assertEqual(kb_hr.inline_keyboard[0][0].callback_data, "hr_act:interview:12345678")
+        self.assertEqual(kb_hr.inline_keyboard[0][1].callback_data, "hr_act:msg:12345678")
+        self.assertEqual(kb_hr.inline_keyboard[1][0].callback_data, "hr_act:reject:12345678")
+
+        kb_manage = get_admin_hr_keyboard([999999])
+        self.assertTrue(any("hr_del:999999" in btn.callback_data for row in kb_manage.inline_keyboard for btn in row if btn.callback_data))
+
+    def test_hr_storage(self):
+        """HR menejerlarni saqlash va zaxira arizalar fayli tekshiruvi."""
+        from bot.utils.hr_storage import add_hr_manager, remove_hr_manager, load_hr_manager_ids, save_submission
+
+        test_hr = 7777777
+        add_hr_manager(test_hr)
+        self.assertIn(test_hr, load_hr_manager_ids())
+        remove_hr_manager(test_hr)
+        self.assertNotIn(test_hr, load_hr_manager_ids())
+
+        sub_id = save_submission({
+            "candidate_user_id": 12345,
+            "full_name": "Test Nomzod",
+            "role": "admin"
+        })
+        self.assertTrue(sub_id.startswith("SUB-"))
+
+    def test_interview_location_and_datetime(self):
+        """Suhbat manzili havolasi va sana/vaqt belgilash tizimi tekshiruvi."""
+        from bot.keyboards.inline import get_candidate_reply_keyboard, get_hr_interview_time_keyboard
+        from bot import config, texts
+
+        # 1. Configdagi Google Maps manzili
+        self.assertEqual(config.OFFICE_LOCATION_URL, "https://maps.app.goo.gl/7g5mPL7AD5kscFqi9")
+
+        # 2. Nomzod javob klaviaturasi (manzil linki bilan)
+        kb_loc = get_candidate_reply_keyboard(location_url=config.OFFICE_LOCATION_URL)
+        self.assertEqual(len(kb_loc.inline_keyboard), 2)
+        self.assertEqual(kb_loc.inline_keyboard[0][0].url, "https://maps.app.goo.gl/7g5mPL7AD5kscFqi9")
+        self.assertEqual(kb_loc.inline_keyboard[1][0].callback_data, "cand_reply")
+
+        # 3. HR sana/vaqt tanlash klaviaturasi
+        kb_time = get_hr_interview_time_keyboard(123456, "office")
+        self.assertGreaterEqual(len(kb_time.inline_keyboard), 4)
+        self.assertEqual(kb_time.inline_keyboard[0][0].callback_data, "hr_t:123456:off:t1")
+        self.assertEqual(kb_time.inline_keyboard[0][1].callback_data, "hr_t:123456:off:t2")
+
+        # 4. Shablon matni to'g'ri formatlanishi
+        formatted_invite = texts.HR_INVITE_OFFICE_TEMPLATE.format(
+            name="Jasur",
+            role="Administrator",
+            datetime="28-sentabr soat 14:00 da",
+            location_url=config.OFFICE_LOCATION_URL
+        )
+        self.assertIn("Jasur", formatted_invite)
+        self.assertIn("Administrator", formatted_invite)
+        self.assertIn("28-sentabr soat 14:00 da", formatted_invite)
+        self.assertIn("https://maps.app.goo.gl/7g5mPL7AD5kscFqi9", formatted_invite)
+
+
 if __name__ == "__main__":
     unittest.main()
+

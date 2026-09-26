@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Union, Dict, Any
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
 
 # Barcha fanlar ro'yxati (IPE School kurslari)
@@ -34,16 +34,24 @@ REGIONS = [
 ]
 
 
-def get_start_keyboard(channel_url: str, website_url: str = "https://ipeschool.uz") -> InlineKeyboardMarkup:
+def get_start_keyboard(
+    channel_url: str,
+    website_url: str = "https://ipeschool.uz",
+    instagram_url: str = "https://www.instagram.com/ipe_school"
+) -> InlineKeyboardMarkup:
     """
     /start xabari uchun menyu tugmalari:
-    1-qator: Kanal va Sayt (yonma-yon)
-    2-qator: Asosiy katta 'Rezyume to'ldirish' tugmasi
-    3-qator: 'Biz haqimizda' va 'Yordam'
+    1-qator: Telegram kanal va Instagram
+    2-qator: Rasmiy sayt
+    3-qator: Asosiy katta 'Rezyume to'ldirish' tugmasi
+    4-qator: 'Biz haqimizda' va 'Yordam'
     """
     keyboard = [
         [
             InlineKeyboardButton("📢 Telegram kanal", url=channel_url),
+            InlineKeyboardButton("📸 Instagram", url=instagram_url)
+        ],
+        [
             InlineKeyboardButton("🌐 Rasmiy sayt", url=website_url)
         ],
         [
@@ -55,6 +63,7 @@ def get_start_keyboard(channel_url: str, website_url: str = "https://ipeschool.u
         ]
     ]
     return InlineKeyboardMarkup(keyboard)
+
 
 
 def get_about_keyboard() -> InlineKeyboardMarkup:
@@ -80,13 +89,24 @@ def get_vacancies_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(keyboard)
 
 
-def get_subscription_keyboard(channel_url: str) -> InlineKeyboardMarkup:
-    """Majburiy obuna tugmalari."""
-    keyboard = [
-        [InlineKeyboardButton("🔗 Kanalga a'zo bo'lish", url=channel_url)],
-        [InlineKeyboardButton("✅ Obuna bo'ldim", callback_data="check_subscription")]
-    ]
+def get_subscription_keyboard(channels: Union[List[dict], str]) -> InlineKeyboardMarkup:
+    """
+    Majburiy obuna tugmalari.
+    channels string (bitta havola) yoki list[dict] (bir nechta kanallar) bo'lishi mumkin.
+    """
+    keyboard = []
+    if isinstance(channels, str):
+        keyboard.append([InlineKeyboardButton("🔗 Kanalga a'zo bo'lish", url=channels)])
+    else:
+        for ch in channels:
+            uname = ch.get("username", "Kanal")
+            title = ch.get("title") or f"🔗 {uname}"
+            keyboard.append([InlineKeyboardButton(f"{title}", url=ch.get("url", "https://t.me/"))])
+
+
+    keyboard.append([InlineKeyboardButton("✅ Obuna bo'ldim", callback_data="check_subscription")])
     return InlineKeyboardMarkup(keyboard)
+
 
 
 def get_phone_request_keyboard() -> ReplyKeyboardMarkup:
@@ -217,7 +237,10 @@ def get_admin_main_keyboard() -> InlineKeyboardMarkup:
             InlineKeyboardButton("📊 Statistika", callback_data="admin_stats"),
             InlineKeyboardButton("🔄 Qayta yangilash", callback_data="admin_refresh")
         ],
-        [InlineKeyboardButton("👤 Nomzod sifatida ko'rish (Preview)", callback_data="admin_candidate_preview")]
+        [
+            InlineKeyboardButton("👥 HR Menejerlar", callback_data="admin_hr_manage"),
+            InlineKeyboardButton("👤 Nomzod Preview", callback_data="admin_candidate_preview")
+        ]
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -231,3 +254,81 @@ def get_broadcast_confirm_keyboard() -> InlineKeyboardMarkup:
         ]
     ]
     return InlineKeyboardMarkup(keyboard)
+
+
+def get_hr_resume_keyboard(candidate_id: int) -> InlineKeyboardMarkup:
+    """
+    Kanal yoki HR chatidagi har bir anketa tagiga biriktiriladigan tezkor HR tugmalari:
+    - Suhbatga chaqirish
+    - Xabar yozish
+    - Rad etish
+    """
+    keyboard = [
+        [
+            InlineKeyboardButton("📅 Suhbatga chaqirish", callback_data=f"hr_act:interview:{candidate_id}"),
+            InlineKeyboardButton("✉️ Xabar yozish", callback_data=f"hr_act:msg:{candidate_id}")
+        ],
+        [
+            InlineKeyboardButton("❌ Rad etish", callback_data=f"hr_act:reject:{candidate_id}")
+        ]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+
+def get_candidate_reply_keyboard(location_url: Optional[str] = None) -> InlineKeyboardMarkup:
+    """Nomzod bot orqali HR xabariga javob berishi uchun tugma (va agar mavjud bo'lsa xarita lokatsiyasi)."""
+    buttons = []
+    if location_url:
+        buttons.append([InlineKeyboardButton("🗺 Manzilni xaritada ochish (Google Maps)", url=location_url)])
+    buttons.append([InlineKeyboardButton("✍️ HR ga javob yozish", callback_data="cand_reply")])
+    return InlineKeyboardMarkup(buttons)
+
+
+def get_hr_interview_templates_keyboard(candidate_id: int) -> InlineKeyboardMarkup:
+    """Suhbatga chaqirish uchun shablonlar menyusi."""
+    keyboard = [
+        [InlineKeyboardButton("🏫 Jonli suhbat (Ofisda)", callback_data=f"hr_tpl:office:{candidate_id}")],
+        [InlineKeyboardButton("💻 Online suhbat (Google Meet)", callback_data=f"hr_tpl:online:{candidate_id}")],
+        [InlineKeyboardButton("✍️ O'z matnimni yozish", callback_data=f"hr_tpl:custom:{candidate_id}")],
+        [InlineKeyboardButton("🔙 Bekor qilish", callback_data=f"hr_tpl:cancel:{candidate_id}")]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+
+def get_hr_interview_time_keyboard(candidate_id: int, interview_type: str = "office") -> InlineKeyboardMarkup:
+    """
+    Suhbat kuni va vaqtini tezkor belgilash klaviaturasi.
+    interview_type: 'office' yoki 'online'
+    """
+    prefix = "off" if interview_type == "office" else "onl"
+    keyboard = [
+        [
+            InlineKeyboardButton("📅 Ertaga 11:00", callback_data=f"hr_t:{candidate_id}:{prefix}:t1"),
+            InlineKeyboardButton("📅 Ertaga 15:00", callback_data=f"hr_t:{candidate_id}:{prefix}:t2"),
+        ],
+        [
+            InlineKeyboardButton("📅 Indinga 11:00", callback_data=f"hr_t:{candidate_id}:{prefix}:t3"),
+            InlineKeyboardButton("📅 Indinga 15:00", callback_data=f"hr_t:{candidate_id}:{prefix}:t4"),
+        ],
+        [
+            InlineKeyboardButton("🕒 Kelishilgan vaqtda", callback_data=f"hr_t:{candidate_id}:{prefix}:t_flex"),
+        ],
+        [
+            InlineKeyboardButton("🔙 Bekor qilish", callback_data=f"hr_tpl:cancel:{candidate_id}"),
+        ]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+
+def get_admin_hr_keyboard(hr_managers: List[int]) -> InlineKeyboardMarkup:
+    """Admin panelda HR menejerlarni boshqarish menyusi."""
+    buttons = []
+    for uid in hr_managers:
+        buttons.append([
+            InlineKeyboardButton(f"👤 HR ID: {uid}", callback_data=f"hr_info:{uid}"),
+            InlineKeyboardButton("🗑 O'chirish", callback_data=f"hr_del:{uid}")
+        ])
+    buttons.append([InlineKeyboardButton("➕ Yangi HR qo'shish", callback_data="hr_add")])
+    buttons.append([InlineKeyboardButton("🔙 Admin panelga qaytish", callback_data="admin_refresh")])
+    return InlineKeyboardMarkup(buttons)
+

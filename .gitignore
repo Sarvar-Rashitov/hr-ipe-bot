@@ -14,4 +14,7 @@ env/
 ENV/
 
 # Data
-# users.json is runtime data
+data/*.pickle
+data/*.json
+!data/.gitkeep
+*.pickle

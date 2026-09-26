@@ -1,39 +1,50 @@
 import logging
-from telegram import Update
+from typing import Tuple, List, Dict, Any
 from telegram.constants import ChatMemberStatus
-from telegram.ext import ContextTypes
-from bot import config, texts
-from bot.keyboards.inline import get_subscription_keyboard
+from bot import config
 
 logger = logging.getLogger(__name__)
+
+VALID_STATUSES = {
+    ChatMemberStatus.OWNER,
+    ChatMemberStatus.ADMINISTRATOR,
+    ChatMemberStatus.MEMBER,
+    ChatMemberStatus.RESTRICTED
+}
+
+
+async def check_user_subscriptions(bot, user_id: int) -> Tuple[bool, List[Dict[str, Any]]]:
+    """
+    Foydalanuvchining barcha majburiy kanallarga a'zo ekanligini tekshirish.
+    Qaytaradi: (barchasiga_obuna_boldimi: bool, a'zo_bolinmagan_kanallar: list)
+    """
+    channels = config.get_required_channels()
+    if not channels:
+        return True, []
+
+    if config.BOT_TOKEN == "YOUR_BOT_TOKEN_HERE" or any(str(ch.get("username", "")).startswith("@test") for ch in channels):
+        return True, []
+
+    missing = []
+    for ch in channels:
+        chat_id = ch["chat_id"]
+        try:
+            member = await bot.get_chat_member(
+                chat_id=chat_id,
+                user_id=user_id
+            )
+            if member.status not in VALID_STATUSES:
+                missing.append(ch)
+        except Exception as e:
+            logger.warning(f"Obunani tekshirishda xatolik ({chat_id}, {user_id}): {e}")
+            missing.append(ch)
+
+    return (len(missing) == 0, missing)
 
 
 async def check_user_subscription(bot, user_id: int) -> bool:
     """
-    Foydalanuvchi kanalga a'zo ekanligini get_chat_member orqali tekshirish.
-    Agar sozlamalarda kanal ko'rsatilmagan bo'lsa, tekshiruvdan o'tkaziladi.
+    Foydalanuvchi barcha kerakli kanallarga a'zo ekanligini tekshirish (orqaga moslik uchun bool).
     """
-    if not config.CHANNEL_USERNAME:
-        return True
-    
-    # Agar bot token yoki kanal noto'g'ri bo'lsa yoki test muhitida bo'lsa
-    if config.CHANNEL_USERNAME.startswith("@test") or config.BOT_TOKEN == "YOUR_BOT_TOKEN_HERE":
-        return True
-
-    try:
-        member = await bot.get_chat_member(
-            chat_id=config.CHANNEL_USERNAME,
-            user_id=user_id
-        )
-        # Qabul qilinadigan statuslar
-        valid_statuses = {
-            ChatMemberStatus.OWNER,
-            ChatMemberStatus.ADMINISTRATOR,
-            ChatMemberStatus.MEMBER,
-            ChatMemberStatus.RESTRICTED
-        }
-        return member.status in valid_statuses
-    except Exception as e:
-        logger.warning(f"Obunani tekshirishda xatolik ({config.CHANNEL_USERNAME}, {user_id}): {e}")
-        # Agar bot kanalda admin bo'lmasa yoki kanal topilmasa:
-        return False
+    is_sub, _ = await check_user_subscriptions(bot, user_id)
+    return is_sub

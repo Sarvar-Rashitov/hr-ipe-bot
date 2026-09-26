@@ -6,19 +6,19 @@
 START_WELCOME = (
     "👋 **Assalomu alaykum!**\n\n"
     "🏫 **IPE School o'quv markazi** — yoshlarga zamonaviy bilim va xalqaro standartlar asosida sifatli ta'lim beruvchi yetakchi markazlardan biridir. Biz o'quvchilarimizning yuksak natijalarga erishishi hamda ustozlarimizning professional rivojlanishi uchun barcha qulay shart-sharoitlarni taqdim etamiz.\n\n"
-    "🎯 Ushbu bot orqali siz **IPE School** jamoasiga o'qituvchilik lavozimiga rezyume (anketa) topshirishingiz mumkin.\n\n"
+    "🎯 Ushbu bot orqali siz **IPE School** jamoasiga ishga kirish uchun rezyume (anketa) topshirishingiz mumkin.\n\n"
     "📢 **Kanalimizga obuna bo'ling:**\n"
-    "Barcha yangiliklar, bo'sh ish o'rinlari va muhim e'lonlardan doimiy xabardor bo'lish hamda anketani to'ldirish uchun rasmiy Telegram kanalimizga a'zo bo'lishingiz lozim.\n\n"
-    "Quyidagi tugmalar orqali kanalimiz va saytimizga o'tishingiz yoki rezyume to'ldirishni boshlashingiz mumkin:"
+    "Barcha yangiliklar, bo'sh ish o'rinlari va muhim e'lonlardan doimiy xabardor bo'lish hamda anketani to'ldirish uchun rasmiy Telegram kanal(lar)imizga a'zo bo'lishingiz lozim.\n\n"
+    "Quyidagi tugmalar orqali kanalimiz, Instagram va saytimizga o'tishingiz yoki rezyume to'ldirishni boshlashingiz mumkin:"
 )
 
 SUBSCRIPTION_REQUIRED = (
-    "Botdan to'liq foydalanish va rezyume to'ldirish uchun quyidagi kanalga obuna bo'ling:"
+    "Botdan to'liq foydalanish va rezyume to'ldirish uchun quyidagi kanal(lar)ga obuna bo'ling:"
 )
 
 SUBSCRIPTION_NOT_FOUND = (
-    "❌ **Siz hali rasmiy kanalimizga a'zo bo'lmadingiz!**\n\n"
-    "Rezyume to'ldirishni boshlash uchun avval rasmiy kanalimizga obuna bo'ling, so'ngra quyidagi tugmani bosing."
+    "❌ **Siz hali rasmiy kanal(lar)imizga a'zo bo'lmadingiz!**\n\n"
+    "Rezyume to'ldirishni boshlash uchun avval ko'rsatilgan kanal(lar)ga obuna bo'ling, so'ngra quyidagi tugmani bosing."
 )
 
 SUBSCRIPTION_SUCCESS = (
@@ -27,6 +27,7 @@ SUBSCRIPTION_SUCCESS = (
     "Anketani to'xtatish uchun istalgan vaqt /cancel buyrug'ini yuborishingiz mumkin.\n\n"
     "Keling, boshlaymiz! 👇"
 )
+
 
 CHOOSE_VACANCY = (
     "💼 **Qaysi vakansiya (lavozim) bo'yicha rezyume topshirmoqchisiz?**\n\n"
@@ -84,10 +85,17 @@ Q_RUSSIAN_LEVEL = (
     "🔟 **Rus tili darajangizni tanlang:**"
 )
 
-Q_EXPERIENCE_YEARS = (
+Q_EXPERIENCE_YEARS_TEACHER = (
     "1️⃣1️⃣ **O'qituvchilik tajribangiz (necha yil):**\n"
     "Quyidagi variantlardan birini tanlang yoki o'zingiz raqam sifatida yozing:"
 )
+
+Q_EXPERIENCE_YEARS_GENERAL = (
+    "1️⃣1️⃣ **Kasbiy ish tajribangiz (necha yil):**\n"
+    "Quyidagi variantlardan birini tanlang yoki o'zingiz raqam sifatida yozing:"
+)
+
+Q_EXPERIENCE_YEARS = Q_EXPERIENCE_YEARS_TEACHER
 
 Q_SUBJECTS = (
     "1️⃣2️⃣ **Qaysi fan(lar)dan dars berasiz?**\n\n"
@@ -179,7 +187,7 @@ Q_EXPECTED_SALARY = (
 
 Q_PHOTO = (
     "3️⃣0️⃣ **O'zingizning sifatli va xushmuomala rasmingizni yuboring:**\n"
-    "_(Iltimos, rasmni hujjat (file) sifatida emas, oddiy rasm (photo) holatida yuboring)_"
+    "_(Rasmni oddiy rasm yoki hujjat/fayl ko'rinishida yuborishingiz mumkin)_"
 )
 
 # -------------------------------------------------------------
@@ -223,6 +231,20 @@ Q_ADMIN_WHY_IPE = (
 Q_ADMIN_GOALS_2Y = (
     "1️⃣9️⃣ **Kelgusi 2 yildan keyingi kasbiy maqsadingiz:**\n"
     "O'zingizni kelajakda qanday mutaxassis darajasida ko'rasiz?"
+)
+
+Q_ADMIN_WORK_TYPE = (
+    "2️⃣0️⃣ **Sizga qaysi ish turi qulay?**"
+)
+
+Q_ADMIN_EXPECTED_SALARY = (
+    "2️⃣1️⃣ **Kutilayotgan oylik maoshingiz miqdori (so'mda):**\n"
+    "_(Faqat raqam kiriting, masalan: 6000000)_"
+)
+
+Q_ADMIN_PHOTO = (
+    "2️⃣2️⃣ **O'zingizning sifatli va xushmuomala rasmingizni yuboring:**\n"
+    "_(Rasmni oddiy rasm yoki hujjat/fayl ko'rinishida yuborishingiz mumkin)_"
 )
 
 # -------------------------------------------------------------
@@ -273,6 +295,55 @@ Q_SALES_GOALS_2Y = (
     "O'zingizni kelajakda qanday darajada (TOP menejer, boshliq) ko'rasiz va qancha daromadga chiqmoqchisiz?"
 )
 
+Q_SALES_WORK_TYPE = (
+    "2️⃣1️⃣ **Sizga qaysi ish turi qulay?**"
+)
+
+Q_SALES_EXPECTED_SALARY = (
+    "2️⃣2️⃣ **Kutilayotgan oylik maoshingiz miqdori (so'mda):**\n"
+    "_(Faqat raqam kiriting, masalan: 6000000)_"
+)
+
+Q_SALES_PHOTO = (
+    "2️⃣3️⃣ **O'zingizning sifatli va xushmuomala rasmingizni yuboring:**\n"
+    "_(Rasmni oddiy rasm yoki hujjat/fayl ko'rinishida yuborishingiz mumkin)_"
+)
+
+
+def get_experience_question(role: str) -> str:
+    """Rolga qarab tajriba savoli matnini qaytaradi."""
+    if role in ("admin", "sales"):
+        return Q_EXPERIENCE_YEARS_GENERAL
+    return Q_EXPERIENCE_YEARS_TEACHER
+
+
+def get_work_type_question(role: str) -> str:
+    """Rolga qarab to'g'ri raqamlangan ish turi savolini qaytaradi."""
+    if role == "admin":
+        return Q_ADMIN_WORK_TYPE
+    elif role == "sales":
+        return Q_SALES_WORK_TYPE
+    return Q_WORK_TYPE
+
+
+def get_salary_question(role: str) -> str:
+    """Rolga qarab to'g'ri raqamlangan maosh savolini qaytaradi."""
+    if role == "admin":
+        return Q_ADMIN_EXPECTED_SALARY
+    elif role == "sales":
+        return Q_SALES_EXPECTED_SALARY
+    return Q_EXPECTED_SALARY
+
+
+def get_photo_question(role: str) -> str:
+    """Rolga qarab to'g'ri raqamlangan rasm so'rash savolini qaytaradi."""
+    if role == "admin":
+        return Q_ADMIN_PHOTO
+    elif role == "sales":
+        return Q_SALES_PHOTO
+    return Q_PHOTO
+
+
 # -------------------------------------------------------------
 # VALIDATSIYA VA XATOLIK MATNLARI
 # -------------------------------------------------------------
@@ -305,7 +376,7 @@ ERR_NO_SUBJECT_SELECTED = (
 )
 
 ERR_PHOTO_REQUIRED = (
-    "⚠️ Iltimos, faqat **rasm** (photo) yuboring! Hujjat (fayl), video yoki matn qabul qilinmaydi."
+    "⚠️ Iltimos, sifatli **rasm** (photo) yoki rasm fayli (.jpg, .png) yuboring! Matn yoki audio qabul qilinmaydi."
 )
 
 CANCEL_SUCCESS = (
@@ -386,6 +457,7 @@ ABOUT_US_TEXT = (
     "Ushbu iqtidorli yoshlar dasturlash sirlarini puxta egallab, nazariy bilimlarini real amaliyotda namoyon etishdi. Ular murakkab logik arxitektura, ko'p bosqichli vakansiyalar boshqaruvi, xavfsiz ma'lumotlar saqlash va Telegram API imkoniyatlarini birlashtirib, markaz faoliyatini avtomatlashtiruvchi professional HR tizimini yaratishdi.\n\n"
     "Ularning bu yo'ldagi fidokorona mehnati, izlanishi va yangilikka intilishi yuksak e'tirofga loyiq! 🚀\n\n"
     "🌐 **Rasmiy sayt:** [ipeschool.uz](https://ipeschool.uz)\n"
+    "📸 **Instagram:** [instagram.com/ipe_school](https://www.instagram.com/ipe_school)\n"
     "📢 **Kanalimiz:** @ipeschool"
 )
 
@@ -402,5 +474,89 @@ HELP_TEXT = (
     "1. 👨‍🏫 **O'qituvchi (Ustoz)**: IELTS, CEFR, SAT, Prezident maktabiga tayyorlov, Python Backend, Matematika va b.\n"
     "2. 💼 **Administrator**: O'quv markazi boshqaruvi va mijozlar bilan ishlash\n"
     "3. 📈 **Sotuv mutaxassisi (Sotuvchi)**: Kurslar va xizmatlar sotuvi\n\n"
-    "Savollar yoki murojaatlar uchun bizning rasmiy kanalimizga murojaat qilishingiz mumkin."
+    "Savollar yoki murojaatlar uchun bizning rasmiy kanalimiz yoki [Instagram sahifamiz](https://www.instagram.com/ipe_school) orqali bog'lanishingiz mumkin."
 )
+
+# -------------------------------------------------------------
+# HR VA NOMZOD ALOQA MATNLARI
+# -------------------------------------------------------------
+HR_INVITE_OFFICE_TEMPLATE = (
+    "🎉 **Assalomu alaykum, {name}!**\n\n"
+    "Sizning **IPE School** dagi **{role}** vakansiyasi bo'yicha yuborgan anketangiz HR jamoamizga juda ma'qul keldi!\n\n"
+    "Sizni o'quv markazimizda **jonli suhbatga (interview)** taklif qilamiz.\n\n"
+    "📅 **Suhbat kuni va vaqti:** {datetime}\n"
+    "📍 **Manzil:** Toshkent shahri, IPE School o'quv markazi\n"
+    "🗺 **Lokatsiya (Google Maps):** {location_url}\n\n"
+    "Iltimos, belgilangan vaqtda yetib kelishingizni so'raymiz. Suhbat vaqtini o'zgartirish yoki savollaringiz bo'lsa, ushbu bot orqali bemalol javob yozishingiz mumkin! 😊"
+)
+
+HR_INVITE_ONLINE_TEMPLATE = (
+    "🎉 **Assalomu alaykum, {name}!**\n\n"
+    "Sizning **IPE School** dagi **{role}** vakansiyasi bo'yicha yuborgan anketangiz HR jamoamiz tomonidan ko'rib chiqildi va sizni **online suhbatga (Google Meet)** taklif qilamiz!\n\n"
+    "📅 **Suhbat kuni va vaqti:** {datetime}\n"
+    "💻 **Format:** Online video-suhbat\n"
+    "🔗 Uchrashuv havolasi tez orada sizga yuboriladi.\n\n"
+    "Savollaringiz bo'lsa, ushbu bot orqali bemalol yozishingiz mumkin!"
+)
+
+HR_PROMPT_INTERVIEW_DATETIME = (
+    "🗓 **Suhbat kuni va vaqtini belgilang:**\n\n"
+    "👤 Nomzod: **{name}** (ID: `{candidate_id}`)\n"
+    "📌 Format: **{format_name}**\n\n"
+    "Quyidagi tezkor tugmalardan birini bosing yoki chatga o'zingiz xohlagan kun va soatni yozing:\n"
+    "_(Masalan: `28-sentabr soat 14:00 da` yoki `Dushanba 11:30 da`)_\n\n"
+    "_(Bekor qilish uchun: /cancel)_"
+)
+
+HR_REJECT_TEMPLATE = (
+    "Assalomu alaykum, {name}!\n\n"
+    "**IPE School** o'quv markazimiz jamoasiga qiziqish bildirganingiz va anketa topshirganingiz uchun samimiy minnatdorchilik bildiramiz.\n\n"
+    "Sizning arizangiz mutaxassislarimiz tomonidan ko'rib chiqildi. Afsuski, ushbu bosqichda boshqa nomzod tanlandi. Biroq sizning ma'lumotlaringiz bizning kadrlar zaxiramizda saqlanadi va yangi loyihalar yoki mos o'rinlar ochilganda siz bilan yana bog'lanamiz.\n\n"
+    "Kelgusi kasbiy faoliyatingizda ulkan muvaffaqiyatlar tilaymiz!"
+)
+
+HR_PROMPT_CUSTOM_MESSAGE = (
+    "✍️ **Nomzodga yuboriladigan xabaringizni yozing:**\n\n"
+    "_(Bekor qilish uchun /cancel buyrug'ini yuboring)_"
+)
+
+HR_MESSAGE_SENT_SUCCESS = (
+    "✅ **Xabaringiz nomzodga muvaffaqiyatli yetkazildi!**"
+)
+
+CANDIDATE_RECEIVED_HR_MSG = (
+    "📩 **IPE School HR bo'limidan xabar:**\n\n"
+    "{text}\n\n"
+    "━━━━━━━━━━━━━━━━━━━━\n"
+    "_Javob qaytarish uchun quyidagi tugmani bosing yoki to'g'ridan-to'g'ri xabar yozing:_"
+)
+
+CANDIDATE_REPLY_PROMPT = (
+    "✍️ **HR menejeriga javobingizni yozing:**\n\n"
+    "_(Xabaringiz to'g'ridan-to'g'ri HR jamoasiga yetkaziladi)_"
+)
+
+CANDIDATE_REPLY_SENT = (
+    "✅ **Javobingiz HR jamoasiga yetkazildi!**\n"
+    "Tez orada javob qaytaramiz."
+)
+
+HR_MANAGEMENT_TITLE = (
+    "👥 **HR Menejerlar Boshqaruvi**\n\n"
+    "Bot orqali kelgan anketalarga javob berish va suhbatga chaqirish huquqiga ega bo'lgan HR menejerlar ro'yxati:\n\n"
+    "• Jami HR menejerlar: **{count}** nafar"
+)
+
+HR_ADD_PROMPT = (
+    "➕ **Yangi HR menejerining Telegram ID raqamini kiriting:**\n\n"
+    "_(Masalan: 123456789. Bekor qilish uchun: /cancel)_"
+)
+
+HR_ADD_SUCCESS = (
+    "✅ **Telegram ID {user_id} muvaffaqiyatli HR menejer sifatida qo'shildi!**"
+)
+
+HR_REMOVE_SUCCESS = (
+    "🗑 **Telegram ID {user_id} HR menejerlar ro'yxatidan o'chirildi.**"
+)
+

@@ -11,11 +11,12 @@ from telegram.ext import (
 )
 from telegram.error import TelegramError
 from bot import config, texts
-from bot.states import AdminState
+from bot.states import AdminState, AdminHRState
 from bot.keyboards.inline import (
     get_admin_main_keyboard,
     get_broadcast_confirm_keyboard,
-    get_start_keyboard
+    get_start_keyboard,
+    get_admin_hr_keyboard
 )
 from bot.utils.storage import (
     load_users,
@@ -23,7 +24,13 @@ from bot.utils.storage import (
     get_all_user_ids,
     remove_user
 )
+from bot.utils.hr_storage import (
+    get_all_hr_managers,
+    add_hr_manager,
+    remove_hr_manager
+)
 from bot.handlers.fallback import cancel_command
+
 
 logger = logging.getLogger(__name__)
 
@@ -113,12 +120,13 @@ async def admin_candidate_preview_callback(update: Update, context: ContextTypes
 
     await query.answer()
     channel_url = config.get_channel_link()
-    candidate_kb = get_start_keyboard(channel_url, config.WEBSITE_URL)
+    candidate_kb = get_start_keyboard(channel_url, config.WEBSITE_URL, config.INSTAGRAM_URL)
 
     # Qo'shimcha admin panelga qaytish tugmasini qo'shish
     buttons = [row.copy() for row in candidate_kb.inline_keyboard]
     buttons.append([InlineKeyboardButton("🔙 Admin panelga qaytish", callback_data="admin_refresh")])
     preview_kb = InlineKeyboardMarkup(buttons)
+
 
     caption = (
         "👁 **[ADMIN PREVIEW] Nomzodlar uchun ko'rinish:**\n\n"
@@ -327,3 +335,126 @@ def get_admin_broadcast_conversation_handler() -> ConversationHandler:
         allow_reentry=True,
         per_message=False
     )
+
+
+# -------------------------------------------------------------
+# HR MENEJERLARNI BOSHQARISH
+# -------------------------------------------------------------
+async def admin_hr_manage_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Admin panelda HR menejerlar ro'yxatini ko'rsatish."""
+    query = update.callback_query
+    user = update.effective_user
+    if not user or not config.is_admin(user.id):
+        if query:
+            await query.answer("Ruxsat berilmagan!", show_alert=True)
+        return
+
+    await query.answer()
+    managers = get_all_hr_managers(config.HR_MANAGER_IDS)
+    text = texts.HR_MANAGEMENT_TITLE.format(count=len(managers))
+    keyboard = get_admin_hr_keyboard(managers)
+
+    try:
+        await query.edit_message_text(
+            text,
+            reply_markup=keyboard,
+            parse_mode="Markdown"
+        )
+    except Exception:
+        await query.message.reply_text(
+            text,
+            reply_markup=keyboard,
+            parse_mode="Markdown"
+        )
+
+
+async def admin_hr_delete_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """HR menejerni o'chirish."""
+    query = update.callback_query
+    user = update.effective_user
+    if not user or not config.is_admin(user.id):
+        if query:
+            await query.answer("Ruxsat berilmagan!", show_alert=True)
+        return
+
+    del_id = int(query.data.split(":")[1])
+    remove_hr_manager(del_id)
+    await query.answer(f"HR ID {del_id} o'chirildi!", show_alert=True)
+
+    managers = get_all_hr_managers(config.HR_MANAGER_IDS)
+    text = texts.HR_MANAGEMENT_TITLE.format(count=len(managers))
+    keyboard = get_admin_hr_keyboard(managers)
+
+    try:
+        await query.edit_message_text(
+            text,
+            reply_markup=keyboard,
+            parse_mode="Markdown"
+        )
+    except Exception:
+        pass
+
+
+async def start_add_hr_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Yangi HR qo'shish so'rovini boshlash."""
+    query = update.callback_query
+    user = update.effective_user
+    if not user or not config.is_admin(user.id):
+        if query:
+            await query.answer("Ruxsat berilmagan!", show_alert=True)
+        return ConversationHandler.END
+
+    await query.answer()
+    await query.message.reply_text(
+        texts.HR_ADD_PROMPT,
+        parse_mode="Markdown"
+    )
+    return AdminHRState.ENTER_HR_ID
+
+
+async def receive_hr_id(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Yangi HR ID sini qabul qilish va saqlash."""
+    msg = update.message
+    user = update.effective_user
+    if not msg or not user or not config.is_admin(user.id):
+        return ConversationHandler.END
+
+    text = (msg.text or "").strip()
+    if not text.isdigit():
+        await msg.reply_text("⚠️ Noto'g'ri format. Iltimos, faqat musbat raqamlardan iborat Telegram ID kiriting:")
+        return AdminHRState.ENTER_HR_ID
+
+    new_id = int(text)
+    add_hr_manager(new_id)
+
+    managers = get_all_hr_managers(config.HR_MANAGER_IDS)
+    await msg.reply_text(
+        texts.HR_ADD_SUCCESS.format(user_id=new_id),
+        parse_mode="Markdown"
+    )
+    await msg.reply_text(
+        texts.HR_MANAGEMENT_TITLE.format(count=len(managers)),
+        reply_markup=get_admin_hr_keyboard(managers),
+        parse_mode="Markdown"
+    )
+    return ConversationHandler.END
+
+
+def get_admin_hr_conversation_handler() -> ConversationHandler:
+    """Yangi HR qo'shish conversation handleri."""
+    return ConversationHandler(
+        entry_points=[
+            CallbackQueryHandler(start_add_hr_callback, pattern=r"^hr_add$"),
+        ],
+        states={
+            AdminHRState.ENTER_HR_ID: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, receive_hr_id),
+            ]
+        },
+        fallbacks=[
+            CommandHandler("cancel", cancel_command),
+        ],
+        allow_reentry=True,
+        per_message=False
+    )
+

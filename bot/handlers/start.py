@@ -30,7 +30,8 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     
     # 2. Tugmalarni shakllantirish
     channel_url = config.get_channel_link()
-    keyboard = get_start_keyboard(channel_url, config.WEBSITE_URL)
+    keyboard = get_start_keyboard(channel_url, config.WEBSITE_URL, config.INSTAGRAM_URL)
+
 
     # 3. Rasm bilan xabar yuborish
     if config.IMAGE_PATH.exists():

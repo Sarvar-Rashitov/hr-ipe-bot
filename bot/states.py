@@ -69,3 +69,20 @@ class AdminState(IntEnum):
     """Admin reklama yuborish (broadcast) jarayoni state'lari."""
     BROADCAST_MESSAGE = auto()  # Reklama xabarini qabul qilish (matn/rasm/video)
     BROADCAST_CONFIRM = auto()  # Tasdiqlashni kutish
+
+
+class HRActionState(IntEnum):
+    """HR menejer nomzodga xabar yoki suhbat taklifnomasi yozish state'lari."""
+    ENTER_MESSAGE = auto()     # Erkin xabar matnini qabul qilish
+    ENTER_INTERVIEW = auto()   # Suhbat taklifnomasi matnini qabul qilish
+
+
+class CandidateReplyState(IntEnum):
+    """Nomzod HR xabariga javob yozish state'i."""
+    ENTER_REPLY = auto()       # Nomzodning HR ga javob matni
+
+
+class AdminHRState(IntEnum):
+    """Admin yangi HR qo'shish state'i."""
+    ENTER_HR_ID = auto()       # Yangi HR ID raqamini kiritish
+
